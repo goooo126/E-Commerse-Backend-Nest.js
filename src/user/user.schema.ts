@@ -12,59 +12,59 @@ export class User {
     min: [3, 'Name Must at least 3 characters'],
     max: [30, 'Name Must at least 30 characters'],
   })
-  name: string;
+  name!: string;
   @Prop({ type: String, required: true, unique: true })
-  email: string;
+  email!: string;
   @Prop({
     type: String,
     required: true,
     min: [3, 'Password Must at least 3 characters'],
     max: [20, 'Password Must at least 20 characters'],
   })
-  password: string;
+  password!: string;
   @Prop({
     type: String,
     required: true,
     enum: ['user', 'admin'],
   })
-  role: string;
+  role!: string;
 
   @Prop({
     type: String,
   })
-  avatar: string;
+  avatar!: string;
 
   @Prop({
     type: Number,
   })
-  age: number;
+  age!: number;
 
   @Prop({
     type: String,
   })
-  phoneNumber: string;
+  phoneNumber!: string;
 
   @Prop({
     type: String,
   })
-  address: string;
+  address!: string;
 
   @Prop({
     type: Boolean,
     enum: [false, true],
   })
-  active: boolean;
+  active!: boolean;
 
   @Prop({
     type: String,
   })
-  verificationCode: string;
+  verificationCode!: string;
 
   @Prop({
     type: String,
     enum:['male','female']
   })
-  gender: string;
+  gender!: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
