@@ -1,4 +1,9 @@
-import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -79,7 +84,7 @@ export class UserService {
     }
 
     // Filter by active
-    if (active!==undefined) {
+    if (active !== undefined) {
       filter.active = active;
     }
 
@@ -204,6 +209,103 @@ export class UserService {
     return {
       status: 200,
       message: 'User Deleted sucessfully :(',
+    };
+  }
+
+  async getProfile(id: string) {
+    //* check the Id is an objectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new HttpException(`Is ${id} a valid ObjectId?`, 400);
+    }
+
+    //* check if the user is exist
+    const user = await this.userModel
+      .findById(id)
+      .select(['-__v', '-password']);
+
+    if (!user) {
+      throw new NotFoundException();
+    }
+    return {
+      status: 200,
+      message: 'User Found sucessfully :)',
+      data: user,
+    };
+  }
+
+  async updateProfile(id: string, updateUserDto: UpdateUserDto) {
+    //* check the Id is an objectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new HttpException(`Is ${id} a valid ObjectId?`, 400);
+    }
+
+    //* check if the user is exist
+    const user = await this.userModel.findById(id);
+
+    if (!user) {
+      throw new NotFoundException();
+    }
+
+    //* check if user change the email:
+    if (updateUserDto.email && updateUserDto.email != user.email) {
+      const existUserWithSameEmail = await this.userModel.findOne({
+        email: updateUserDto.email,
+      });
+
+      if (existUserWithSameEmail) {
+        throw new HttpException('This email already exist', 409);
+      }
+    }
+
+    //* check if it will change the role:
+    if (updateUserDto.role) {
+      if (user.role !== 'admin') {
+        throw new UnauthorizedException();
+      }
+    }
+
+    //* check if the user change the password:
+    if (updateUserDto.password) {
+      //* Hash the password before store it in database:
+      const saltOrRounds = 10;
+      const password = updateUserDto.password;
+      const hash = await bcrypt.hash(password, saltOrRounds);
+      updateUserDto.password = hash;
+    }
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .select(['-__v', '-password']);
+
+    return {
+      status: 200,
+      message: 'User Updated sucessfully :)',
+      data: {
+        updatedUser,
+      },
+    };
+  }
+
+  async deleteProfile(id: string) {
+    //* check the Id is an objectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new HttpException(`Is ${id} a valid ObjectId?`, 400);
+    }
+
+    //* check if the user is exist
+    const user = await this.userModel.findById(id);
+
+    if (!user) {
+      throw new NotFoundException();
+    }
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(id, { active: false }, { new: true })
+      .select(['-__v', '-password']);
+
+    return {
+      status: 200,
+      message: 'User Delete sucessfully :(',
     };
   }
 }
