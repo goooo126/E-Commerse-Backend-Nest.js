@@ -3,8 +3,9 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './user.schema';
-import mongoose, { Model } from 'mongoose';
+import mongoose, { Model, SortOrder } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { GetUsersDto } from './dto/get-users.dto';
 
 @Injectable()
 export class UserService {
@@ -28,7 +29,7 @@ export class UserService {
     const user = this.userModel.create({
       ...createUserDto,
       password: hash,
-      role: 'user',
+      role: createUserDto.role ? createUserDto.role : 'user',
       active: true,
     });
     return {
@@ -42,12 +43,73 @@ export class UserService {
     };
   }
 
-  async findAll() {
-    const users = await this.userModel.find().select(['-__v', '-password']);
+  async findAll(query: GetUsersDto) {
+    const {
+      limit = 10,
+      skip = 0,
+      sort = 'createdAt',
+      order = 'desc',
+      name,
+      email,
+      role,
+      active,
+    } = query;
+
+    const filter: any = {};
+
+    // Filter by name
+    if (name) {
+      filter.name = {
+        $regex: name,
+        $options: 'i',
+      };
+    }
+
+    // Filter by email
+    if (email) {
+      filter.email = {
+        $regex: email,
+        $options: 'i',
+      };
+    }
+
+    // Filter by role
+    if (role) {
+      filter.role = role;
+    }
+
+    // Filter by active
+    if (active!==undefined) {
+      filter.active = active;
+    }
+
+    const sortOptions: Record<string, SortOrder> = {
+      [sort]: order === 'asc' ? 1 : -1,
+    };
+
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .select('-password -__v')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit),
+
+      this.userModel.countDocuments(filter),
+    ]);
+
     return {
       status: 200,
-      message: 'User created sucessfully :)',
-      data: users,
+      message: 'Users fetched successfully',
+      data: {
+        users,
+        pagination: {
+          total,
+          limit,
+          skip,
+          returned: users.length,
+        },
+      },
     };
   }
 
@@ -88,7 +150,7 @@ export class UserService {
     }
 
     //* check if user change the email:
-    if (updateUserDto.email&&updateUserDto.email!=user.email) {
+    if (updateUserDto.email && updateUserDto.email != user.email) {
       const existUserWithSameEmail = await this.userModel.findOne({
         email: updateUserDto.email,
       });
@@ -107,11 +169,9 @@ export class UserService {
       updateUserDto.password = hash;
     }
 
-    const updatedUser = await this.userModel.findByIdAndUpdate(
-      id,
-      updateUserDto,
-      { new: true },
-    ).select(['-__v','-password']);
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .select(['-__v', '-password']);
 
     return {
       status: 200,
@@ -128,7 +188,6 @@ export class UserService {
       throw new HttpException(`Is ${id} a valid ObjectId?`, 400);
     }
 
-
     //* check if the user is exist
     const user = await this.userModel.findById(id);
 
@@ -139,12 +198,12 @@ export class UserService {
     //TODO: Handle the relate Date in future
 
     const deleteUser = await this.userModel.findByIdAndDelete(id);
-    
+
     //TODO: Invalidate Sessions
 
     return {
-      status:200,
-      message: "User Deleted sucessfully :("
+      status: 200,
+      message: 'User Deleted sucessfully :(',
     };
   }
 }

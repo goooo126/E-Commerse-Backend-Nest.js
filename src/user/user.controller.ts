@@ -7,7 +7,8 @@ import {
   Param,
   Delete,
   ValidationPipe,
-  UseGuards
+  UseGuards,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -16,6 +17,7 @@ import { AuthGuard } from './guard/auth.guard';
 import { Roles } from './decorator/roles.decorator';
 import { Role } from './enums/roles.enum';
 import { RolesGuard } from './guard/role.guard';
+import { GetUsersDto } from './dto/get-users.dto';
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
@@ -35,7 +37,7 @@ export class UserController {
         transform: true,
       }),
     )
-    createUserDto: CreateUserDto
+    createUserDto: CreateUserDto,
   ) {
     return this.userService.create(createUserDto);
   }
@@ -48,8 +50,16 @@ export class UserController {
   @Get()
   @Roles(Role.Admin)
   @UseGuards(AuthGuard, RolesGuard)
-  findAll() {
-    return this.userService.findAll();
+  findAll(
+    @Query(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    query: GetUsersDto,
+  ) {
+    return this.userService.findAll(query);
   }
 
   //?=======================================
