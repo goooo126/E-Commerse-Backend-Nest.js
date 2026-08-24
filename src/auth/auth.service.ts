@@ -1,4 +1,4 @@
-import { ConflictException, HttpException, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, HttpException, Injectable } from '@nestjs/common';
 import { SignUpDto } from './Dto/signUp-auth.Dto';
 import { SignInDto } from './Dto/signIn-auth.Dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -65,6 +65,11 @@ export class AuthService {
 
     if (!existUser) {
       throw new ConflictException('The User is not Found');
+    }
+
+    //* check if user account is active or not:
+    if(!existUser.active){
+      throw new ForbiddenException();
     }
 
     //* compare password:
