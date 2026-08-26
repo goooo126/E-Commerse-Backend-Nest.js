@@ -59,6 +59,10 @@ export class User {
     type: String,
   })
   verificationCode!: string;
+  @Prop({
+    type: Date,
+  })
+  verificationCodeExpired!: Date;
 
   @Prop({
     type: String,

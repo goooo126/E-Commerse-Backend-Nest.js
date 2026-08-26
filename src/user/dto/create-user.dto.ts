@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsDate,
   IsDefined,
   IsEmail,
   IsEnum,
@@ -79,6 +80,13 @@ export class CreateUserDto {
   @Length(6, 6, { message: 'the verificationCode must be 6 characters' })
   @IsOptional()
   verificationCode!: string;
+  //*=======================================
+
+
+  //* verificationCodeExpired:
+  @IsDate({ message: 'the verificationCodeExpired must be string' })
+  @IsOptional()
+  verificationCodeExpired!: string;
   //*=======================================
 
   //* Gender:
