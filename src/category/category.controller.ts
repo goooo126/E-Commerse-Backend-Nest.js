@@ -51,21 +51,46 @@ export class CategoryController {
     return this.categoryService.findAll();
   }
 
+  //?=======================================
+  //* @Docs   any one can get single category
+  //* @Route  GET /api/v1/category/:id
+  //* @access Public
+  //?=======================================
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.categoryService.findOne(+id);
+    return this.categoryService.findOne(id);
   }
 
+  //?=======================================
+  //* @Docs   Admin can update single category
+  //* @Route  PATCH /api/v1/category/:id
+  //* @access Private['admin']
+  //?=======================================
   @Patch(':id')
+  @Roles(Role.Admin)
+  @UseGuards(AuthGuard, RolesGuard)
   update(
     @Param('id') id: string,
-    @Body() updateCategoryDto: UpdateCategoryDto,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    updateCategoryDto: UpdateCategoryDto,
   ) {
-    return this.categoryService.update(+id, updateCategoryDto);
+    return this.categoryService.update(id, updateCategoryDto);
   }
 
+  //?=======================================
+  //* @Docs  Admin can delete single category
+  //* @Route  DELET /api/v1/category/:id
+  //* @access Private ['admin']
+  //?=======================================
   @Delete(':id')
+  @Roles(Role.Admin)
+  @UseGuards(AuthGuard,RolesGuard)
   remove(@Param('id') id: string) {
-    return this.categoryService.remove(+id);
+    return this.categoryService.remove(id);
   }
 }

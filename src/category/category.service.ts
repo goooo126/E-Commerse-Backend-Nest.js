@@ -3,7 +3,7 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Category } from './category.schema';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 
 @Injectable()
 export class CategoryService {
@@ -48,15 +48,67 @@ export class CategoryService {
     };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} category`;
+  async findOne(id: string) {
+    //* check the id is valid:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new HttpException(`Is ${id} a valid ObjectId?`, 400);
+    }
+
+    //* check if the category is founed or not:
+    const category = await this.categoryModel.findById(id);
+    if (!category) {
+      throw new HttpException('Category is not Found :)', 404);
+    }
+
+    return {
+      status: 200,
+      message: 'The Category is founed Successfully',
+      data: category,
+    };
   }
 
-  update(id: number, updateCategoryDto: UpdateCategoryDto) {
-    return `This action updates a #${id} category`;
+  async update(id: string, updateCategoryDto: UpdateCategoryDto) {
+    //* check if the id is a valid ID:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new HttpException(`Is ${id} a valid ObjectId`, 400);
+    }
+
+    //* check if the category is founded or not:
+    const existedCategory = await this.categoryModel.findById(id);
+    if (!existedCategory) {
+      throw new HttpException('Category is not Found', 404);
+    }
+
+    const newCategory = await this.categoryModel.findOneAndUpdate(
+      { _id: id },
+      updateCategoryDto,
+      { new: true },
+    );
+    return {
+      status: 200,
+      message: 'The Category is updated successfully',
+      data: newCategory,
+    };
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} category`;
+  async remove(id: string) {
+    //* check if the id is valid:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new HttpException(`Is ${id} is a valid ObjectId`, 400);
+    }
+
+    //* check if the category is exist:
+    const existedCategory = await this.categoryModel.findById(id);
+    if (!existedCategory) {
+      throw new HttpException('category is not founded', 404);
+    }
+
+    //TODO: delete all subCategory related to this:
+
+    await this.categoryModel.findOneAndDelete({ _id: id });
+    return {
+      status: 200,
+      message: 'the category is deleted successfully :)',
+    };
   }
 }
