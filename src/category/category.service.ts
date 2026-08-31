@@ -86,28 +86,28 @@ export class CategoryService {
     );
     return {
       status: 200,
-      message: 'The Category is updated successfully',
+      message: "The Category is updated successfully",
       data: newCategory,
     };
   }
 
   async remove(id: string) {
-    //* check if the id is valid:
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new HttpException(`Is ${id} is a valid ObjectId`, 400);
+    //* check if the id is valid: 
+    if(!mongoose.Types.ObjectId.isValid(id)){
+      throw new HttpException(`Is ${id} is a valid ObjectId`,400);
     }
 
     //* check if the category is exist:
     const existedCategory = await this.categoryModel.findById(id);
-    if (!existedCategory) {
-      throw new HttpException('category is not founded', 404);
+    if(!existedCategory){
+      throw new HttpException('category is not founded',404);
     }
 
     //TODO: delete all subCategory related to this:
 
-    await this.categoryModel.findOneAndDelete({ _id: id });
+    await this.categoryModel.findOneAndDelete({_id:id});
     return {
-      status: 200,
+      status:200,
       message: 'the category is deleted successfully :)',
     };
   }
