@@ -110,7 +110,10 @@ export class CategoryService {
       throw new HttpException('category is not founded', 404);
     }
 
-    //TODO: delete all subCategory related to this:
+    //* delete all subCategory related to this:
+    await this.subCategoryModel.deleteMany({
+      category: id,
+    });
 
     await this.categoryModel.findOneAndDelete({ _id: id });
     return {
