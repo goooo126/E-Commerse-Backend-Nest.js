@@ -15,7 +15,7 @@ import { SubCategoryModule } from './sub-category/sub-category.module';
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '60s' },
+      signOptions: { expiresIn: '60000s' },
     }),
     MailerModule.forRoot({
       transport: {

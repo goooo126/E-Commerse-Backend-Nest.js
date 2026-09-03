@@ -36,26 +36,54 @@ export class SubCategoryController {
     return this.subCategoryService.create(createSubCategoryDto);
   }
 
+  //?=======================================
+  //* @Docs   Any user can get all subCategories
+  //* @Route  GET /api/v1/sub-category
+  //* @access Public
+  //?=======================================
   @Get()
   findAll() {
     return this.subCategoryService.findAll();
   }
 
+  //?=======================================
+  //* @Docs   Any user can get single subCategory
+  //* @Route  GET /api/v1/sub-category/:id
+  //* @access Public
+  //?=======================================
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.subCategoryService.findOne(+id);
+    return this.subCategoryService.findOne(id);
   }
 
+
+  //?=======================================
+  //* @Docs   Admin can update a subCategory
+  //* @Route  PATCH /api/v1/sub-category/:id
+  //* @access Private['Admin']
+  //?=======================================
   @Patch(':id')
+  @Roles(Role.Admin)
+  @UseGuards(AuthGuard,RolesGuard)
   update(
     @Param('id') id: string,
-    @Body() updateSubCategoryDto: UpdateSubCategoryDto,
+    @Body(new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),) updateSubCategoryDto: UpdateSubCategoryDto,
   ) {
-    return this.subCategoryService.update(+id, updateSubCategoryDto);
+    return this.subCategoryService.update(id, updateSubCategoryDto);
   }
 
+  //?=======================================
+  //* @Docs   Admin can Delete a subCategory
+  //* @Route  DELETE /api/v1/sub-category/:id
+  //* @access Private['Admin']
+  //?=======================================
   @Delete(':id')
+  @Roles(Role.Admin)
+  @UseGuards(AuthGuard,RolesGuard)
   remove(@Param('id') id: string) {
-    return this.subCategoryService.remove(+id);
+    return this.subCategoryService.remove(id);
   }
 }
