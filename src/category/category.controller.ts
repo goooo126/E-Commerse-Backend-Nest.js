@@ -52,6 +52,16 @@ export class CategoryController {
   }
 
   //?=======================================
+  //* @Docs   any one can get all subCategory for category
+  //* @Route  GET /api/v1/category/:categoryId/subCategories
+  //* @access Public
+  //?=======================================
+  @Get(':categoryId/subCategories')
+  findSubCategories(@Param('categoryId') categoryId: string) {
+    return this.categoryService.findSubCategories(categoryId);
+  }
+
+  //?=======================================
   //* @Docs   any one can get single category
   //* @Route  GET /api/v1/category/:id
   //* @access Public
