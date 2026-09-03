@@ -1,14 +1,21 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Category } from './category.schema';
 import mongoose, { Model } from 'mongoose';
+import { SubCategory } from 'src/sub-category/sub-category.schema';
 
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectModel(Category.name) private categoryModel: Model<Category>,
+    @InjectModel(SubCategory.name) private subCategoryModel: Model<SubCategory>,
   ) {}
   async create(createCategoryDto: CreateCategoryDto) {
     //* check if the category is exist or not
@@ -86,29 +93,53 @@ export class CategoryService {
     );
     return {
       status: 200,
-      message: "The Category is updated successfully",
+      message: 'The Category is updated successfully',
       data: newCategory,
     };
   }
 
   async remove(id: string) {
-    //* check if the id is valid: 
-    if(!mongoose.Types.ObjectId.isValid(id)){
-      throw new HttpException(`Is ${id} is a valid ObjectId`,400);
+    //* check if the id is valid:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new HttpException(`Is ${id} is a valid ObjectId`, 400);
     }
 
     //* check if the category is exist:
     const existedCategory = await this.categoryModel.findById(id);
-    if(!existedCategory){
-      throw new HttpException('category is not founded',404);
+    if (!existedCategory) {
+      throw new HttpException('category is not founded', 404);
     }
 
     //TODO: delete all subCategory related to this:
 
-    await this.categoryModel.findOneAndDelete({_id:id});
+    await this.categoryModel.findOneAndDelete({ _id: id });
     return {
-      status:200,
+      status: 200,
       message: 'the category is deleted successfully :)',
+    };
+  }
+
+  async findSubCategories(categoryId: string) {
+    //* check if the id is valid:
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      throw new BadRequestException(`Is ${categoryId} is a valid ObjectId`);
+    }
+
+    //* check if the category is existed:
+    const existedCategory = await this.categoryModel.findById(categoryId);
+    if (!existedCategory) {
+      throw new NotFoundException('The category is not existed :(');
+    }
+
+    const subCategories = await this.subCategoryModel
+      .find({ category: categoryId })
+      .select(['-__v']);
+
+    return {
+      status: 200,
+      message: 'subCategories founded successfully',
+      length: subCategories.length,
+      data: subCategories,
     };
   }
 }
