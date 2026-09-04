@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { BrandService } from './brand.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
@@ -16,6 +17,7 @@ import { Roles } from 'src/user/decorator/roles.decorator';
 import { Role } from 'src/user/enums/roles.enum';
 import { AuthGuard } from 'src/user/guard/auth.guard';
 import { RolesGuard } from 'src/user/guard/role.guard';
+import { GetBrandsDto } from './dto/get-brands-dto';
 
 @Controller('brand')
 export class BrandController {
@@ -47,8 +49,11 @@ export class BrandController {
   //* @access Public
   //?=======================================
   @Get()
-  findAll() {
-    return this.brandService.findAll();
+  findAll(@Query(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  }),) query:GetBrandsDto) {
+    return this.brandService.findAll(query);
   }
 
   //?=======================================
@@ -58,7 +63,7 @@ export class BrandController {
   //?=======================================
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.brandService.findOne(+id);
+    return this.brandService.findOne(id);
   }
 
   //?=======================================
@@ -69,8 +74,11 @@ export class BrandController {
   @Patch(':id')
   @Roles(Role.Admin)
   @UseGuards(AuthGuard, RolesGuard)
-  update(@Param('id') id: string, @Body() updateBrandDto: UpdateBrandDto) {
-    return this.brandService.update(+id, updateBrandDto);
+  update(@Param('id') id: string, @Body(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  }),) updateBrandDto: UpdateBrandDto) {
+    return this.brandService.update(id, updateBrandDto);
   }
 
   //?=======================================
@@ -82,6 +90,6 @@ export class BrandController {
   @Roles(Role.Admin)
   @UseGuards(AuthGuard, RolesGuard)
   remove(@Param('id') id: string) {
-    return this.brandService.remove(+id);
+    return this.brandService.remove(id);
   }
 }
