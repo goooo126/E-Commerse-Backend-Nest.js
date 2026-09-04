@@ -17,12 +17,13 @@ export class Coupon {
     type: Date,
     required: true,
   })
-  exipreDate!: Date;
+  expireDate!: Date;
 
   @Prop({
     type: Number,
     required: true,
     min: 0,
+    max: 90,
   })
   discount!: number;
 }

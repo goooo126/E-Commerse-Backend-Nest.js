@@ -1,4 +1,5 @@
-import { IsDate, IsDefined, IsNumber, IsString, MaxLength, Min, MinLength } from "class-validator";
+import { Type } from "class-transformer";
+import { IsDate, IsDefined, IsNumber, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
 
 export class CreateCouponDto {
     //* Name:
@@ -8,16 +9,18 @@ export class CreateCouponDto {
     name!:string;
     //*-----------------------------------------------
 
-    //* exipreDate:
+    //* expireDate:
     @IsDate({message:"exipreDate must be valid date"})
     @IsDefined()
-    exipreDate!:Date;
+    @Type(() => Date)
+    expireDate!:Date;
     //*-----------------------------------------------
 
 
     //* discount:
     @IsNumber({},{message:"The discount must be number"})
     @Min(0,{message:"Discount must be 0 or larger"})
+    @Max(90,{message:"Discoun must be 90 or lower"})
     @IsDefined()
     discount!:number;
     //*-----------------------------------------------

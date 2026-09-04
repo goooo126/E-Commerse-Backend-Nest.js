@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ValidationPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ValidationPipe,
+  Query,
+} from '@nestjs/common';
 import { CouponService } from './coupon.service';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
@@ -19,11 +30,16 @@ export class CouponController {
   //?=======================================
   @Post()
   @Roles(Role.Admin)
-  @UseGuards(AuthGuard,RolesGuard)
-  create(@Body(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }),) createCouponDto: CreateCouponDto) {
+  @UseGuards(AuthGuard, RolesGuard)
+  create(
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    createCouponDto: CreateCouponDto,
+  ) {
     return this.couponService.create(createCouponDto);
   }
 
@@ -34,11 +50,18 @@ export class CouponController {
   //?=======================================
   @Get()
   @Roles(Role.Admin)
-  @UseGuards(AuthGuard,RolesGuard)
-  findAll(@Query() query:GetCouponsDto) {
+  @UseGuards(AuthGuard, RolesGuard)
+  findAll(
+    @Query(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    query: GetCouponsDto,
+  ) {
     return this.couponService.findAll(query);
   }
-
 
   //?=======================================
   //* @Docs   Admin can get a single Coupon
@@ -47,7 +70,7 @@ export class CouponController {
   //?=======================================
   @Get(':id')
   @Roles(Role.Admin)
-  @UseGuards(AuthGuard,RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   findOne(@Param('id') id: string) {
     return this.couponService.findOne(id);
   }
@@ -59,14 +82,19 @@ export class CouponController {
   //?=======================================
   @Patch(':id')
   @Roles(Role.Admin)
-  @UseGuards(AuthGuard,RolesGuard)
-  update(@Param('id') id: string, @Body(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }),) updateCouponDto: UpdateCouponDto) {
+  @UseGuards(AuthGuard, RolesGuard)
+  update(
+    @Param('id') id: string,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    updateCouponDto: UpdateCouponDto,
+  ) {
     return this.couponService.update(id, updateCouponDto);
   }
-
 
   //?=======================================
   //* @Docs   Admin can delete a Coupon
@@ -75,7 +103,7 @@ export class CouponController {
   //?=======================================
   @Delete(':id')
   @Roles(Role.Admin)
-  @UseGuards(AuthGuard,RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   remove(@Param('id') id: string) {
     return this.couponService.remove(id);
   }
