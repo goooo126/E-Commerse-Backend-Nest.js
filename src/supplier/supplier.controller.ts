@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { SupplierService } from './supplier.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
@@ -16,6 +17,7 @@ import { Roles } from 'src/user/decorator/roles.decorator';
 import { Role } from 'src/user/enums/roles.enum';
 import { AuthGuard } from 'src/user/guard/auth.guard';
 import { RolesGuard } from 'src/user/guard/role.guard';
+import { GetSupplierDto } from './dto/get-supplier.dto';
 
 @Controller('supplier')
 export class SupplierController {
@@ -42,8 +44,11 @@ export class SupplierController {
   //* @access Public
   //?=======================================
   @Get()
-  findAll() {
-    return this.supplierService.findAll();
+  findAll(@Query(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+  }),) query:GetSupplierDto) {
+    return this.supplierService.findAll(query);
   }
 
   //?=======================================
@@ -53,7 +58,7 @@ export class SupplierController {
   //?=======================================
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.supplierService.findOne(+id);
+    return this.supplierService.findOne(id);
   }
 
   //?=======================================
@@ -71,7 +76,7 @@ export class SupplierController {
       transform: true,
     }),) updateSupplierDto: UpdateSupplierDto,
   ) {
-    return this.supplierService.update(+id, updateSupplierDto);
+    return this.supplierService.update(id, updateSupplierDto);
   }
 
   //?=======================================
@@ -83,6 +88,6 @@ export class SupplierController {
   @Roles(Role.Admin)
   @UseGuards(AuthGuard, RolesGuard)
   remove(@Param('id') id: string) {
-    return this.supplierService.remove(+id);
+    return this.supplierService.remove(id);
   }
 }
