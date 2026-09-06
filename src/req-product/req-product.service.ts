@@ -10,23 +10,23 @@ export class ReqProductService {
   constructor(
     @InjectModel(ReqProduct.name) private reqProductModel: Model<ReqProduct>,
   ) {}
-  create(createReqProductDto: CreateReqProductDto) {
+  create(createReqProductDto: CreateReqProductDto, req: Request) {
     return 'This action adds a new reqProduct';
   }
 
-  findAll() {
+  findAll(req: Request) {
     return `This action returns all reqProduct`;
   }
 
-  findOne(id: number) {
+  findOne(id: string, req: Request) {
     return `This action returns a #${id} reqProduct`;
   }
 
-  update(id: number, updateReqProductDto: UpdateReqProductDto) {
+  update(id: string, updateReqProductDto: UpdateReqProductDto, req: Request) {
     return `This action updates a #${id} reqProduct`;
   }
 
-  remove(id: number) {
+  remove(id: string, req: Request) {
     return `This action removes a #${id} reqProduct`;
   }
 }

@@ -1,34 +1,102 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ValidationPipe,
+  Req,
+} from '@nestjs/common';
 import { ReqProductService } from './req-product.service';
 import { CreateReqProductDto } from './dto/create-req-product.dto';
 import { UpdateReqProductDto } from './dto/update-req-product.dto';
+import { Role } from 'src/user/enums/roles.enum';
+import { Roles } from 'src/user/decorator/roles.decorator';
+import { AuthGuard } from 'src/user/guard/auth.guard';
+import { RolesGuard } from 'src/user/guard/role.guard';
 
 @Controller('req-product')
 export class ReqProductController {
   constructor(private readonly reqProductService: ReqProductService) {}
 
+  //?=======================================
+  //* @Docs   User can create new Coupon
+  //* @Route  POST /api/v1/req-product
+  //* @access Private['user']
+  //?=======================================
   @Post()
-  create(@Body() createReqProductDto: CreateReqProductDto) {
-    return this.reqProductService.create(createReqProductDto);
+  @Roles(Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  create(
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    createReqProductDto: CreateReqProductDto,
+    @Req() req:Request
+  ) {
+    return this.reqProductService.create(createReqProductDto,req);
   }
 
+  //?=======================================
+  //* @Docs   Admin can get all reqProducts & User can get all owned reqProducts
+  //* @Route  GET /api/v1/req-product
+  //* @access Private['amdin','user']
+  //?=======================================
   @Get()
-  findAll() {
-    return this.reqProductService.findAll();
+  @Roles(Role.Admin, Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  findAll( @Req() req:Request) {
+    return this.reqProductService.findAll(req);
   }
 
+  //?=======================================
+  //* @Docs   Admin can get any reqProducts & User can get an owned reqProduct
+  //* @Route  GET /api/v1/req-product/:id
+  //* @access Private['amdin','user']
+  //?=======================================
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.reqProductService.findOne(+id);
+  @Roles(Role.Admin, Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  findOne(@Param('id') id: string, @Req() req:Request) {
+    return this.reqProductService.findOne(id,req);
   }
 
+  //?=======================================
+  //* @Docs   User can update an owned reqProducts only
+  //* @Route  PATCH /api/v1/req-product/:id
+  //* @access Private['user']
+  //?=======================================
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateReqProductDto: UpdateReqProductDto) {
-    return this.reqProductService.update(+id, updateReqProductDto);
+  @Roles(Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  update(
+    @Param('id') id: string,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    updateReqProductDto: UpdateReqProductDto, @Req() req:Request
+  ) {
+    return this.reqProductService.update(id, updateReqProductDto,req);
   }
 
+  //?=======================================
+  //* @Docs   User can delete an owned reqProducts only
+  //* @Route  DELETE /api/v1/req-product/:id
+  //* @access Private['user']
+  //?=======================================
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.reqProductService.remove(+id);
+  @Roles(Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  remove(@Param('id') id: string, @Req() req:Request) {
+    return this.reqProductService.remove(id,req);
   }
 }
