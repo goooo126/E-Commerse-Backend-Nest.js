@@ -8,7 +8,7 @@ import {
   Delete,
   UseGuards,
   ValidationPipe,
-  Req,
+  Query,
 } from '@nestjs/common';
 import { ReqProductService } from './req-product.service';
 import { CreateReqProductDto } from './dto/create-req-product.dto';
@@ -17,6 +17,8 @@ import { Role } from 'src/user/enums/roles.enum';
 import { Roles } from 'src/user/decorator/roles.decorator';
 import { AuthGuard } from 'src/user/guard/auth.guard';
 import { RolesGuard } from 'src/user/guard/role.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { GetReqProductsDto } from './dto/get-reqProducts.dto';
 
 @Controller('req-product')
 export class ReqProductController {
@@ -38,9 +40,9 @@ export class ReqProductController {
       }),
     )
     createReqProductDto: CreateReqProductDto,
-    @Req() req:Request
+    @CurrentUser() user: any,
   ) {
-    return this.reqProductService.create(createReqProductDto,req);
+    return this.reqProductService.create(createReqProductDto, user);
   }
 
   //?=======================================
@@ -51,8 +53,8 @@ export class ReqProductController {
   @Get()
   @Roles(Role.Admin, Role.User)
   @UseGuards(AuthGuard, RolesGuard)
-  findAll( @Req() req:Request) {
-    return this.reqProductService.findAll(req);
+  findAll(@Query() query: GetReqProductsDto, @CurrentUser() user: any) {
+    return this.reqProductService.findAll(user,query);
   }
 
   //?=======================================
@@ -63,8 +65,8 @@ export class ReqProductController {
   @Get(':id')
   @Roles(Role.Admin, Role.User)
   @UseGuards(AuthGuard, RolesGuard)
-  findOne(@Param('id') id: string, @Req() req:Request) {
-    return this.reqProductService.findOne(id,req);
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.reqProductService.findOne(id, user);
   }
 
   //?=======================================
@@ -83,9 +85,10 @@ export class ReqProductController {
         transform: true,
       }),
     )
-    updateReqProductDto: UpdateReqProductDto, @Req() req:Request
+    updateReqProductDto: UpdateReqProductDto,
+    @CurrentUser() user: any,
   ) {
-    return this.reqProductService.update(id, updateReqProductDto,req);
+    return this.reqProductService.update(id, updateReqProductDto, user);
   }
 
   //?=======================================
@@ -96,7 +99,7 @@ export class ReqProductController {
   @Delete(':id')
   @Roles(Role.User)
   @UseGuards(AuthGuard, RolesGuard)
-  remove(@Param('id') id: string, @Req() req:Request) {
-    return this.reqProductService.remove(id,req);
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.reqProductService.remove(id, user);
   }
 }

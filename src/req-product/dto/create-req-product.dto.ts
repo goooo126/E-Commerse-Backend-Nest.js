@@ -19,7 +19,7 @@ export class CreateReqProductDto {
   @IsInt({ message: 'The quantity must be Integer Number' })
   @Min(1, { message: 'The quantity must at least 1 product' })
   @IsDefined()
-  quantity!: string;
+  quantity!: number;
   //* -------------------------------------------------------
 
   //* category:
