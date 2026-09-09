@@ -173,7 +173,7 @@ export class CouponService {
     }
 
     //* check if the coupon is existed:
-    const coupon = await this.couponModel.findById(id).select('-__V');
+    const coupon = await this.couponModel.findById(id).select('-__v');
     if (!coupon) {
       throw new NotFoundException('Coupon is not founded');
     }
