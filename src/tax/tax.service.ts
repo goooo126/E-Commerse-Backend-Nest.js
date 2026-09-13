@@ -12,9 +12,10 @@ import mongoose, { Model } from 'mongoose';
 @Injectable()
 export class TaxService {
   constructor(@InjectModel(Tax.name) private taxModel: Model<Tax>) {}
+
   async create(createTaxDto: CreateTaxDto) {
     //* check if the Tax is already existed:
-    const existedTax = await this.taxModel.findOne({ name: CreateTaxDto.name });
+    const existedTax = await this.taxModel.findOne({ name: createTaxDto.name });
     if (existedTax) {
       throw new BadRequestException('The Tax is already existed');
     }
