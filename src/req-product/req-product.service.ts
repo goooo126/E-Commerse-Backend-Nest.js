@@ -52,7 +52,15 @@ export class ReqProductService {
     //* check the role Admin:
     if (user.role === Role.Admin) {
       const [reqProducts, total] = await Promise.all([
-        this.reqProductModel.find().select('-__v').skip(skip).limit(limit),
+        this.reqProductModel
+          .find()
+          .select('-__v')
+          .skip(skip)
+          .limit(limit)
+          .populate({
+            path: 'user',
+            select: 'name email',
+          }),
         this.reqProductModel.countDocuments(),
       ]);
 
@@ -163,6 +171,16 @@ export class ReqProductService {
       throw new UnauthorizedException();
     }
 
+    //* check if the titlename is not existed:
+    const findExistedReqProduct = await this.reqProductModel.findOne({
+      titleName: updateReqProductDto.titleName,
+      _id: { $ne: id },
+    });
+    if (findExistedReqProduct) {
+      throw new BadRequestException('This Request product is already existed');
+    }
+
+    //* Update the Requst Product:
     const updatedReqProduct = await this.reqProductModel.findByIdAndUpdate(
       id,
       updateReqProductDto,
