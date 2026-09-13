@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateTaxDto } from './dto/create-tax.dto';
 import { UpdateTaxDto } from './dto/update-tax.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -8,8 +8,20 @@ import { Model } from 'mongoose';
 @Injectable()
 export class TaxService {
   constructor(@InjectModel(Tax.name) private taxModel: Model<Tax>) {}
-  create(createTaxDto: CreateTaxDto) {
-    return 'This action adds a new tax';
+  async create(createTaxDto: CreateTaxDto) {
+    //* check if the Tax is already existed:
+    const existedTax = await this.taxModel.findOne({ name: CreateTaxDto.name });
+    if (existedTax) {
+      throw new BadRequestException('The Tax is already existed');
+    }
+
+    //* create new Tax
+    const tax = await this.taxModel.create(createTaxDto);
+    return {
+      status: 201,
+      message: 'Tax created successfully',
+      data: tax,
+    };
   }
 
   findAll() {
