@@ -87,7 +87,7 @@ export class ProductService {
     const product = await this.productModel
       .findById(id)
       .select('-__v')
-      .populate(['category', 'subCategory', 'brand'],['name']);
+      .populate(['category', 'subCategory', 'brand'], ['name']);
 
     if (!product) {
       throw new NotFoundException('The product is not founded');
@@ -103,7 +103,18 @@ export class ProductService {
     return `This action updates a #${id} product`;
   }
 
-  async remove(id: string) {
-    return `This action removes a #${id} product`;
+  async remove(id: string): Promise<void> {
+    //* check if the id is a valid id:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('This id must be valid id');
+    }
+
+    //* check if the product is existed:
+    const product = await this.productModel.findById(id);
+    if (!product) {
+      throw new NotFoundException('The product is not founded');
+    }
+
+    await this.productModel.findByIdAndDelete(id);
   }
 }
