@@ -7,7 +7,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Product } from './product.schema';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { GetProductsDto } from './dto/get-products.dto';
 import { Category } from 'src/category/category.schema';
 import { SubCategory } from 'src/sub-category/sub-category.schema';
@@ -78,7 +78,25 @@ export class ProductService {
   }
 
   async findOne(id: string) {
-    return `This action returns a #${id} product`;
+    //* check if the id is a valid id:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('This id must be valid id');
+    }
+
+    //* check if the product is existed:
+    const product = await this.productModel
+      .findById(id)
+      .select('-__v')
+      .populate(['category', 'subCategory', 'brand'],['name']);
+
+    if (!product) {
+      throw new NotFoundException('The product is not founded');
+    }
+    return {
+      stauts: 200,
+      message: 'The product founded successfully',
+      data: product,
+    };
   }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
