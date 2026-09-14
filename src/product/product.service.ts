@@ -38,7 +38,10 @@ export class ProductService {
           : null,
 
         createProductDto.subCategory
-          ? this.subCategoryModel.findById(createProductDto.subCategory)
+          ? this.subCategoryModel.findOne({
+              _id: createProductDto.subCategory,
+              category: createProductDto.category,
+            })
           : null,
 
         createProductDto.brand
@@ -51,7 +54,9 @@ export class ProductService {
     }
 
     if (createProductDto.subCategory && !existedSubCategory) {
-      throw new NotFoundException('The subCategory was not found');
+      throw new NotFoundException(
+        'The subCategory was not found or not belong to the category',
+      );
     }
 
     if (createProductDto.brand && !existedBrand) {
