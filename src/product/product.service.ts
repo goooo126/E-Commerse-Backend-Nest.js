@@ -100,7 +100,85 @@ export class ProductService {
   }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
+    //* check if the id is a valid id:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('The Id must be valid id');
+    }
+
+    //* check if the product is exsited:
+    const existedProduct = await this.productModel.findById(id);
+    if (!existedProduct) {
+      throw new NotFoundException('The product is not found');
+    }
+
+    //* check if there is update in product title:
+    if (updateProductDto.title) {
+      const product = await this.productModel.findOne({
+        title: updateProductDto.title,
+        _id: { $ne: id },
+      });
+
+      if (product) {
+        throw new BadRequestException('The product is already exsited');
+      }
+    }
+
+    //* check if there is update in (category or subcategory or brand):
+    const categoryId = updateProductDto.category ?? existedProduct.category;
+
+    //* If category changes, require a subCategory
+    if (
+      updateProductDto.category &&
+      updateProductDto.category.toString() !==
+        existedProduct.category.toString() &&
+      !updateProductDto.subCategory
+    ) {
+      throw new BadRequestException(
+        'SubCategory is required when changing the category',
+      );
+    }
+
+    //* Validate category + subCategory relationship
+    const [existedCategory, existedSubCategory, existedBrand] =
+      await Promise.all([
+        updateProductDto.category
+          ? this.categoryModel.findById(updateProductDto.category)
+          : null,
+
+        updateProductDto.subCategory
+          ? this.subCategoryModel.findOne({
+              _id: updateProductDto.subCategory,
+              category: categoryId,
+            })
+          : null,
+        updateProductDto.brand
+          ? this.brandModel.findById(updateProductDto.brand)
+          : null,
+      ]);
+
+    if (updateProductDto.category && !existedCategory) {
+      throw new NotFoundException('The category was not found');
+    }
+
+    if (updateProductDto.subCategory && !existedSubCategory) {
+      throw new NotFoundException(
+        'The subCategory was not found or does not belong to the category',
+      );
+    }
+
+    if (updateProductDto.brand && !existedBrand) {
+      throw new NotFoundException('The brand was not found');
+    }
+
+    //* Update the product
+    const updatedProduct = await this.productModel
+      .findByIdAndUpdate(id, updateProductDto, { new: true, fields: '-__v' })
+      .populate(['category', 'subCategory', 'brand'], ['name']);
+    return {
+      stauts: 200,
+      message: 'Product updated',
+      data: updatedProduct,
+    };
   }
 
   async remove(id: string): Promise<void> {
