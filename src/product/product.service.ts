@@ -7,7 +7,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Product } from './product.schema';
-import mongoose, { Model } from 'mongoose';
+import mongoose, { Model, SortOrder } from 'mongoose';
 import { GetProductsDto } from './dto/get-products.dto';
 import { Category } from 'src/category/category.schema';
 import { SubCategory } from 'src/sub-category/sub-category.schema';
@@ -74,7 +74,76 @@ export class ProductService {
   }
 
   async findAll(query: GetProductsDto) {
-    return `This action returns all product`;
+    const {
+      limit = 10,
+      skip = 0,
+      title,
+      category,
+      subCategory,
+      brand,
+      minPrice,
+      maxPrice,
+      sort = 'createdAt',
+      order = 'asc',
+    } = query;
+
+    const filter: any = {};
+
+    if (title) {
+      filter.title = {
+        $regex: title,
+        $options: 'i',
+      };
+    }
+
+    if (category) {
+      filter.category = category;
+    }
+    if (subCategory) {
+      filter.subCategory = subCategory;
+    }
+    if (brand) {
+      filter.brand = brand;
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      filter.price = {};
+
+      if (minPrice !== undefined) {
+        filter.price.$gte = minPrice;
+      }
+
+      if (maxPrice !== undefined) {
+        filter.price.$lte = maxPrice;
+      }
+    }
+
+    const sortOptions: Record<string, SortOrder> = {
+      [sort]: order === 'asc' ? 1 : -1,
+    };
+
+    const [products, total] = await Promise.all([
+      this.productModel
+        .find(filter)
+        .select('-__v')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit),
+      this.productModel.countDocuments(filter),
+    ]);
+    return {
+      status: 200,
+      message: 'products fetched successfully',
+      data: {
+        products,
+        pagination: {
+          total,
+          limit,
+          skip,
+          returned: products.length,
+        },
+      },
+    };
   }
 
   async findOne(id: string) {

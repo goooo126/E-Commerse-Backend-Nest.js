@@ -8,7 +8,7 @@ export class GetProductsDto {
 
   @IsOptional()
   @IsString()
-  name?: string;
+  title?: string;
 
   @IsOptional()
   @IsMongoId()
