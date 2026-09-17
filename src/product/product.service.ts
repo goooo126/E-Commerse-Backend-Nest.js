@@ -128,7 +128,8 @@ export class ProductService {
         .select('-__v')
         .sort(sortOptions)
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .populate(['category', 'subCategory', 'brand'], ['name']),
       this.productModel.countDocuments(filter),
     ]);
     return {
