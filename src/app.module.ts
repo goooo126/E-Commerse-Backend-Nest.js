@@ -12,6 +12,7 @@ import { CouponModule } from './coupon/coupon.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { ReqProductModule } from './req-product/req-product.module';
 import { TaxModule } from './tax/tax.module';
+import { ProductModule } from './product/product.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { TaxModule } from './tax/tax.module';
     SupplierModule,
     ReqProductModule,
     TaxModule,
+    ProductModule,
   ],
 })
 export class AppModule {}
