@@ -13,6 +13,7 @@ import { SupplierModule } from './supplier/supplier.module';
 import { ReqProductModule } from './req-product/req-product.module';
 import { TaxModule } from './tax/tax.module';
 import { ProductModule } from './product/product.module';
+import { ReviewModule } from './review/review.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ProductModule } from './product/product.module';
     ReqProductModule,
     TaxModule,
     ProductModule,
+    ReviewModule,
   ],
 })
 export class AppModule {}
