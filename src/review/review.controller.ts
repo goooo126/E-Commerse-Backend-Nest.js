@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { ReviewService } from './review.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -17,6 +18,7 @@ import { Roles } from 'src/user/decorator/roles.decorator';
 import { AuthGuard } from 'src/user/guard/auth.guard';
 import { RolesGuard } from 'src/user/guard/role.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { GetReviewDto } from './dto/get-review.dto';
 
 @Controller('review')
 export class ReviewController {
@@ -51,8 +53,8 @@ export class ReviewController {
   @Get()
   @Roles(Role.User, Role.Admin)
   @UseGuards(AuthGuard, RolesGuard)
-  findAll(@CurrentUser() user: any) {
-    return this.reviewService.findAll(user);
+  findAll(@Query() query: GetReviewDto, @CurrentUser() user: any) {
+    return this.reviewService.findAll(query,user);
   }
 
   //?=======================================
@@ -77,7 +79,10 @@ export class ReviewController {
   @UseGuards(AuthGuard, RolesGuard)
   update(
     @Param('id') id: string,
-    @Body() updateReviewDto: UpdateReviewDto,
+    @Body(new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),) updateReviewDto: UpdateReviewDto,
     @CurrentUser() user: any,
   ) {
     return this.reviewService.update(id, updateReviewDto, user);
@@ -89,9 +94,9 @@ export class ReviewController {
   //* @access Private['user','admin']
   //?=======================================
   @Delete(':id')
-  @Roles(Role.Admin,Role.User)
-  @UseGuards(AuthGuard,RolesGuard)
-  remove(@Param('id') id: string,@CurrentUser() user:any) {
-    return this.reviewService.remove(id,user);
+  @Roles(Role.Admin, Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.reviewService.remove(id, user);
   }
 }

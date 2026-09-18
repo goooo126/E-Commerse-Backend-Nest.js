@@ -2,14 +2,18 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Review } from './review.schema';
-import { Connection, Model } from 'mongoose';
+import mongoose, { Connection, Model } from 'mongoose';
 import { Product } from 'src/product/product.schema';
 import { User } from 'src/user/user.schema';
+import { GetReviewDto } from './dto/get-review.dto';
+import { Roles } from 'src/user/decorator/roles.decorator';
+import { Role } from 'src/user/enums/roles.enum';
 
 @Injectable()
 export class ReviewService {
@@ -78,7 +82,11 @@ export class ReviewService {
       // Commit
       await session.commitTransaction();
 
-      return newReview;
+      return {
+        status: 201,
+        message: 'The review is created successfuly',
+        data: newReview,
+      };
     } catch (error) {
       // Rollback
       await session.abortTransaction();
@@ -88,16 +96,98 @@ export class ReviewService {
     }
   }
 
-  findAll(user: any) {
-    return `This action returns all review`;
+  async findAll(query: GetReviewDto, user: any) {
+    const { limit = 10, skip = 0 } = query;
+
+    if (user.role === Role.Admin) {
+      const [reviews, total] = await Promise.all([
+        this.reviewModel
+          .find()
+          .skip(skip)
+          .limit(limit)
+          .select('-__v')
+          .populate('user', 'name'),
+        this.reviewModel.countDocuments(),
+      ]);
+
+      return {
+        status: 200,
+        message: 'get all reviews',
+        data: reviews,
+        pagination: {
+          total,
+          limit,
+          skip,
+          returned: reviews.length,
+        },
+      };
+    }
+
+    if (user.role === Role.User) {
+      const [reviews, total] = await Promise.all([
+        this.reviewModel
+          .find()
+          .where({ user: user.id })
+          .skip(skip)
+          .limit(limit)
+          .select('-__v')
+          .populate('user', 'name'),
+        this.reviewModel.countDocuments(),
+      ]);
+
+      return {
+        status: 200,
+        message: 'get all reviews owned by the user',
+        data: reviews,
+        pagination: {
+          total,
+          limit,
+          skip,
+          returned: reviews.length,
+        },
+      };
+    }
   }
 
-  findOne(id: string, user: any) {
-    return `This action returns a #${id} review`;
+  async findOne(id: string, user: any) {
+    //* check if the id is a mongoId:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('The Id is invalid');
+    }
+
+    //* check if the review is existed:
+    const existReview = await this.reviewModel.findById(id).select('-__v');
+    if (!existReview) {
+      throw new NotFoundException('The review is not exsisted');
+    }
+
+    //* Admin:
+    if (user.role === Role.Admin) {
+      return {
+        status: 200,
+        message: 'The review founded',
+        data: existReview,
+      };
+    }
+
+    //* user:
+    if (user.role === Role.User) {
+      if (existReview.user != user.id) {
+        throw new UnauthorizedException(
+          'This Review is not belong to this user',
+        );
+      }
+
+      return {
+        status: 200,
+        message: 'The review founded',
+        data: existReview,
+      };
+    }
   }
 
-  update(id: string, updateReviewDto: UpdateReviewDto, user: any) {
-    return `This action updates a #${id} review`;
+  async update(id: string, updateReviewDto: UpdateReviewDto, user: any) {
+    
   }
 
   remove(id: string, user: any) {
