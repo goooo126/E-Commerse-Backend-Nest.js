@@ -187,7 +187,73 @@ export class ReviewService {
   }
 
   async update(id: string, updateReviewDto: UpdateReviewDto, user: any) {
-    
+    //* check if the id is mongoId:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('The id is Invalid');
+    }
+
+    //* check if the review is alreay existed:
+    const existedReview = await this.reviewModel.findById(id);
+    if (!existedReview) {
+      throw new NotFoundException('The review is not found');
+    }
+
+    //* check if the user own the review:
+    if (existedReview.user !== user.id) {
+      throw new UnauthorizedException('This user does not own the review');
+    }
+
+    //* get the product:
+    const existedProduct = await this.productModel.findById(
+      existedReview.product,
+    );
+    if (!existedProduct) {
+      throw new NotFoundException('The product is not found');
+    }
+
+    var rateingAverage = existedProduct.rateingAverage;
+    //* if user update the rating
+    if (updateReviewDto.rating) {
+      rateingAverage =
+        (existedProduct.rateingAverage + updateReviewDto.rating) /
+        existedProduct.rateingCount;
+    }
+
+    //* start session
+    const session = await this.connection.startSession();
+
+    try {
+      session.startTransaction();
+
+      //* update Review
+      const updatedReview = await this.reviewModel.findByIdAndUpdate(
+        id,
+        updateReviewDto,
+        { new: true, fields: '-__v', session },
+      );
+
+      //* update the product:
+      await this.productModel.findByIdAndUpdate(
+        updateReviewDto.product,
+        {
+          rateingAverage: rateingAverage,
+        },
+        { session, new: true },
+      );
+
+      await session.commitTransaction();
+
+      return {
+        status: 200,
+        message: 'The review updated sucessfully',
+        data: updatedReview,
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      await session.endSession();
+    }
   }
 
   remove(id: string, user: any) {
