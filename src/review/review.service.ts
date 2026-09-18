@@ -14,23 +14,23 @@ export class ReviewService {
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(User.name) private userModel: Model<User>,
   ) {}
-  create(createReviewDto: CreateReviewDto) {
+  create(createReviewDto: CreateReviewDto, user: any) {
     return 'This action adds a new review';
   }
 
-  findAll() {
+  findAll(user: any) {
     return `This action returns all review`;
   }
 
-  findOne(id: number) {
+  findOne(id: string, user: any) {
     return `This action returns a #${id} review`;
   }
 
-  update(id: number, updateReviewDto: UpdateReviewDto) {
+  update(id: string, updateReviewDto: UpdateReviewDto, user: any) {
     return `This action updates a #${id} review`;
   }
 
-  remove(id: number) {
+  remove(id: string, user: any) {
     return `This action removes a #${id} review`;
   }
 }
