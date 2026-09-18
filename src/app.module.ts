@@ -18,7 +18,7 @@ import { ReviewModule } from './review/review.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
-    MongooseModule.forRoot('mongodb://localhost:27017/ecommerce'),
+    MongooseModule.forRoot('mongodb://localhost:27017/ecommerce?replicaSet=rs0'),
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,
