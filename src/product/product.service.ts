@@ -307,7 +307,7 @@ export class ProductService {
         .skip(skip)
         .limit(limit)
         .select('-__v'),
-      this.reviewModel.countDocuments(),
+      this.reviewModel.countDocuments({ product: id }),
     ]);
     return {
       status: 200,
