@@ -44,6 +44,25 @@ export class ProductController {
   }
 
   //?=======================================
+  //* @Docs   Any User can get all reviews for a product
+  //* @Route  GET /api/v1/product/id/reviews
+  //* @access Public
+  //?=======================================
+  @Get(':id/reviews')
+  findReviewsForProducut(
+    @Query(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    query: GetProductsDto,
+    @Param('id') id: string,
+  ) {
+    return this.productService.findReviewsForProducut(id, query);
+  }
+
+  //?=======================================
   //* @Docs   Any User can get all products with filters
   //* @Route  GET /api/v1/product
   //* @access Public

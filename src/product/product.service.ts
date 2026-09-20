@@ -5,13 +5,14 @@ import {
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Product } from './product.schema';
-import mongoose, { Model, SortOrder } from 'mongoose';
+import mongoose, { Connection, connection, Model, SortOrder } from 'mongoose';
 import { GetProductsDto } from './dto/get-products.dto';
 import { Category } from 'src/category/category.schema';
 import { SubCategory } from 'src/sub-category/sub-category.schema';
 import { Brand } from 'src/brand/brand.schema';
+import { Review } from 'src/review/review.schema';
 
 @Injectable()
 export class ProductService {
@@ -20,6 +21,8 @@ export class ProductService {
     @InjectModel(Category.name) private categoryModel: Model<Category>,
     @InjectModel(SubCategory.name) private subCategoryModel: Model<SubCategory>,
     @InjectModel(Brand.name) private brandModel: Model<Brand>,
+    @InjectModel(Review.name) private reviewModel: Model<Review>,
+    @InjectConnection() private connection: Connection,
   ) {}
 
   async create(createProductDto: CreateProductDto) {
@@ -263,6 +266,61 @@ export class ProductService {
       throw new NotFoundException('The product is not founded');
     }
 
-    await this.productModel.findByIdAndDelete(id);
+    const session = await this.connection.startSession();
+
+    try {
+      session.startTransaction();
+
+      //* Delete product
+      await this.productModel.findByIdAndDelete(id, {
+        session,
+      });
+
+      //*  Delete all reviews related to this product
+      await this.reviewModel.deleteMany({ product: id }, { session });
+
+      await session.commitTransaction();
+    } catch (error) {
+      session.abortTransaction();
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  async findReviewsForProducut(id: string, query: GetProductsDto) {
+    const { limit = 10, skip = 0 } = query;
+    //* check if the id is valid:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('The id is invalid');
+    }
+
+    //* check if the product is existed:
+    const existedProduct = await this.productModel.findById(id);
+    if (!existedProduct) {
+      throw new NotFoundException('The product is not found');
+    }
+
+    const [reviews, total] = await Promise.all([
+      this.reviewModel
+        .find({ product: id })
+        .skip(skip)
+        .limit(limit)
+        .select('-__v'),
+      this.reviewModel.countDocuments({ product: id }),
+    ]);
+    return {
+      status: 200,
+      message: 'reviews fetched successfully',
+      data: {
+        reviews,
+        pagination: {
+          total,
+          limit,
+          skip,
+          returned: reviews.length,
+        },
+      },
+    };
   }
 }
