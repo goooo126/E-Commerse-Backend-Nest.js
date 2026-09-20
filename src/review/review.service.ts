@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -24,6 +25,53 @@ export class ReviewService {
     @InjectConnection()
     private readonly connection: Connection,
   ) {}
+
+  private async recalculateProductRating(
+    productId: string | mongoose.Types.ObjectId,
+    session: mongoose.ClientSession,
+  ) {
+    const objectId =
+      typeof productId === 'string'
+        ? new mongoose.Types.ObjectId(productId)
+        : productId;
+
+    const result = await this.reviewModel
+      .aggregate([
+        {
+          $match: {
+            product: objectId,
+          },
+        },
+        {
+          $group: {
+            _id: '$product',
+            averageRating: { $avg: '$rating' },
+            ratingsCount: { $sum: 1 },
+          },
+        },
+      ])
+      .session(session);
+
+    const rating = result[0] || {
+      averageRating: 0,
+      ratingsCount: 0,
+    };
+
+    await this.productModel.findByIdAndUpdate(
+      productId,
+      {
+        averageRating: rating.averageRating,
+        ratingsCount: rating.ratingsCount,
+      },
+      {
+        session,
+        runValidators: true,
+      },
+    );
+
+    return rating;
+  }
+
   async create(createReviewDto: CreateReviewDto, user: any) {
     //* Check if the product exists
     //* Check if this user already reviewed the product
@@ -63,20 +111,10 @@ export class ReviewService {
       );
 
       //* Update Product
-      const result = await this.reviewModel.aggregate([
-        {
-          $match: {
-            product: new mongoose.Types.ObjectId(createReviewDto.product),
-          },
-        },
-        {
-          $group: {
-            _id: '$product',
-            averageRating: { $avg: '$rating' },
-            ratingsCount: { $sum: 1 },
-          },
-        },
-      ]);
+      const result = await this.recalculateProductRating(
+        createReviewDto.product,
+        session,
+      );
 
       const rating = result[0] || {
         averageRating: 0,
@@ -248,22 +286,10 @@ export class ReviewService {
 
       //* 7. Recalculate product rating
       if (updateReviewDto.rating !== undefined) {
-        const result = await this.reviewModel
-          .aggregate([
-            {
-              $match: {
-                product: existedReview.product,
-              },
-            },
-            {
-              $group: {
-                _id: '$product',
-                averageRating: { $avg: '$rating' },
-                ratingsCount: { $sum: 1 },
-              },
-            },
-          ])
-          .session(session);
+        const result = await this.recalculateProductRating(
+          existedReview.product,
+          session,
+        );
 
         const rating = result[0] || {
           averageRating: 0,
@@ -302,7 +328,61 @@ export class ReviewService {
     }
   }
 
-  remove(id: string, user: any) {
-    return `This action removes a #${id} review`;
+  async remove(id: string, user: any): Promise<void> {
+    //* check if the Id is valid id:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('The id is invalid');
+    }
+
+    //* check if the review is existed:
+    const existedReview = await this.reviewModel.findById(id).select('-__v');
+    if (!existedReview) {
+      throw new NotFoundException('The review is not found');
+    }
+
+    //* check if the user is own the review:
+    if (existedReview.user.toString() !== user.id) {
+      throw new ForbiddenException('You are not allowed to delete this review');
+    }
+
+    const session = await this.connection.startSession();
+
+    try {
+      session.startTransaction();
+
+      await this.reviewModel.findByIdAndDelete(id, { session: session });
+
+      const result = await this.recalculateProductRating(
+        existedReview.product,
+        session,
+      );
+
+      const rating = result[0] || {
+        averageRating: 0,
+        ratingsCount: 0,
+      };
+
+      //* 8. Update product rating
+      await this.productModel.findByIdAndUpdate(
+        existedReview.product,
+        {
+          averageRating: rating.averageRating,
+          ratingsCount: rating.ratingsCount,
+        },
+        {
+          session,
+          runValidators: true,
+        },
+      );
+
+      await session.commitTransaction();
+    } catch (error) {
+      //* Abort transaction if an error occurs
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      //* End session
+      await session.endSession();
+    }
   }
 }
