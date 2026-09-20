@@ -278,7 +278,7 @@ export class ProductService {
 
       //*  Delete all reviews related to this product
       await this.reviewModel.deleteMany({ product: id }, { session });
-      
+
       await session.commitTransaction();
     } catch (error) {
       session.abortTransaction();
@@ -286,5 +286,41 @@ export class ProductService {
     } finally {
       await session.endSession();
     }
+  }
+
+  async findReviewsForProducut(id: string, query: GetProductsDto) {
+    const { limit = 10, skip = 0 } = query;
+    //* check if the id is valid:
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('The id is invalid');
+    }
+
+    //* check if the product is existed:
+    const existedProduct = await this.productModel.findById(id);
+    if (!existedProduct) {
+      throw new NotFoundException('The product is not found');
+    }
+
+    const [reviews, total] = await Promise.all([
+      this.reviewModel
+        .find({ product: id })
+        .skip(skip)
+        .limit(limit)
+        .select('-__v'),
+      this.reviewModel.countDocuments(),
+    ]);
+    return {
+      status: 200,
+      message: 'reviews fetched successfully',
+      data: {
+        reviews,
+        pagination: {
+          total,
+          limit,
+          skip,
+          returned: reviews.length,
+        },
+      },
+    };
   }
 }
