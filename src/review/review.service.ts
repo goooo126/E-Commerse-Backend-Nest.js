@@ -45,10 +45,6 @@ export class ReviewService {
       );
     }
 
-    const rateingAverage =
-      (existedProduct.rateingAverage + createReviewDto.rating) /
-      (existedProduct.rateingCount + 1);
-
     // Start transaction
     const session = await this.connection.startSession();
 
@@ -66,18 +62,31 @@ export class ReviewService {
         { session },
       );
 
-      // Update Product
-      await this.productModel.findByIdAndUpdate(
-        createReviewDto.product,
+      //* Update Product
+      const result = await this.reviewModel.aggregate([
         {
-          rateingAverage: rateingAverage,
-          rateingCount: existedProduct.rateingCount + 1,
+          $match: {
+            product: new mongoose.Types.ObjectId(createReviewDto.product),
+          },
         },
         {
-          session,
-          new: true,
+          $group: {
+            _id: '$product',
+            averageRating: { $avg: '$rating' },
+            ratingsCount: { $sum: 1 },
+          },
         },
-      );
+      ]);
+
+      const rating = result[0] || {
+        averageRating: 0,
+        ratingsCount: 0,
+      };
+
+      await this.productModel.findByIdAndUpdate(createReviewDto.product, {
+        rateingAverage: rating.averageRating,
+        rateingCount: rating.ratingsCount,
+      });
 
       // Commit
       await session.commitTransaction();
@@ -187,71 +196,108 @@ export class ReviewService {
   }
 
   async update(id: string, updateReviewDto: UpdateReviewDto, user: any) {
-    //* check if the id is mongoId:
+    //* 1. Check if the id is a valid MongoId
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('The id is Invalid');
+      throw new BadRequestException('The id is invalid');
     }
 
-    //* check if the review is alreay existed:
-    const existedReview = await this.reviewModel.findById(id);
-    if (!existedReview) {
-      throw new NotFoundException('The review is not found');
-    }
-
-    //* check if the user own the review:
-    if (existedReview.user !== user.id) {
-      throw new UnauthorizedException('This user does not own the review');
-    }
-
-    //* get the product:
-    const existedProduct = await this.productModel.findById(
-      existedReview.product,
-    );
-    if (!existedProduct) {
-      throw new NotFoundException('The product is not found');
-    }
-
-    var rateingAverage = existedProduct.rateingAverage;
-    //* if user update the rating
-    if (updateReviewDto.rating) {
-      rateingAverage =
-        (existedProduct.rateingAverage + updateReviewDto.rating) /
-        existedProduct.rateingCount;
-    }
-
-    //* start session
+    //* 2. Start session
     const session = await this.connection.startSession();
 
     try {
       session.startTransaction();
 
-      //* update Review
+      //* 3. Check if the review exists
+      const existedReview = await this.reviewModel
+        .findById(id)
+        .session(session);
+
+      if (!existedReview) {
+        throw new NotFoundException('The review is not found');
+      }
+
+      //* 4. Check if the user owns the review
+      if (existedReview.user.toString() !== user.id) {
+        throw new UnauthorizedException('This user does not own the review');
+      }
+
+      //* 5. Get the product
+      const existedProduct = await this.productModel
+        .findById(existedReview.product)
+        .session(session);
+
+      if (!existedProduct) {
+        throw new NotFoundException('The product is not found');
+      }
+
+      //* 6. Update review
       const updatedReview = await this.reviewModel.findByIdAndUpdate(
         id,
         updateReviewDto,
-        { new: true, fields: '-__v', session },
-      );
-
-      //* update the product:
-      await this.productModel.findByIdAndUpdate(
-        updateReviewDto.product,
         {
-          rateingAverage: rateingAverage,
+          new: true,
+          projection: '-__v',
+          session,
+          runValidators: true,
         },
-        { session, new: true },
       );
 
+      if (!updatedReview) {
+        throw new NotFoundException('The review is not found');
+      }
+
+      //* 7. Recalculate product rating
+      if (updateReviewDto.rating !== undefined) {
+        const result = await this.reviewModel
+          .aggregate([
+            {
+              $match: {
+                product: existedReview.product,
+              },
+            },
+            {
+              $group: {
+                _id: '$product',
+                averageRating: { $avg: '$rating' },
+                ratingsCount: { $sum: 1 },
+              },
+            },
+          ])
+          .session(session);
+
+        const rating = result[0] || {
+          averageRating: 0,
+          ratingsCount: 0,
+        };
+
+        //* 8. Update product rating
+        await this.productModel.findByIdAndUpdate(
+          existedReview.product,
+          {
+            averageRating: rating.averageRating,
+            ratingsCount: rating.ratingsCount,
+          },
+          {
+            session,
+            runValidators: true,
+          },
+        );
+      }
+
+      //* 9. Commit transaction
       await session.commitTransaction();
 
       return {
         status: 200,
-        message: 'The review updated sucessfully',
+        message: 'The review updated successfully',
         data: updatedReview,
       };
     } catch (error) {
+      //* Abort transaction if an error occurs
       await session.abortTransaction();
       throw error;
     } finally {
+      //* End session
       await session.endSession();
     }
   }
