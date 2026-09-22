@@ -25,12 +25,12 @@ export class CreateCartDto {
   @Min(1, {
     message: 'The quantity must be 1 or larger',
   })
-  quantity?: number;
+  quantity: number =1;
 
   //* Color
   @IsOptional()
   @IsString({
     message: 'The color must be a string',
   })
-  color?: string;
+  color: string='';
 }

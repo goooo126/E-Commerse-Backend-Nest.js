@@ -24,7 +24,7 @@ export class CartController {
 
   //?=======================================
   //* @Docs   Only User can create or add product to his cart
-  //* @Route  POST /api/v1/product/cart
+  //* @Route  POST /api/v1/cart
   //* @access Private(['user'])
   //?=======================================
   @Post()
