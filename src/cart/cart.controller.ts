@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   ValidationPipe,
+  Query,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CreateCartDto } from './dto/create-cart.dto';
@@ -17,6 +18,9 @@ import { Role } from 'src/user/enums/roles.enum';
 import { AuthGuard } from 'src/user/guard/auth.guard';
 import { RolesGuard } from 'src/user/guard/role.guard';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { GetCartDto } from './dto/get-cart.dto';
+import { User } from 'src/user/user.schema';
+import { ApplyCouponDto } from './dto/apply-coupon.dto';
 
 @Controller('cart')
 export class CartController {
@@ -44,32 +48,59 @@ export class CartController {
   }
 
   //?=======================================
-  //* @Docs   Admin can get all carts
+  //* @Docs   Admin can get all carts or user get his cart
   //* @Route  GET /api/v1/product/cart
-  //* @access Private(['admin'])
+  //* @access Private(['admin',user])
   //?=======================================
   @Get()
-  @Roles(Role.Admin)
+  @Roles(Role.Admin,Role.User)
   @UseGuards(AuthGuard, RolesGuard)
-  findAll() {
-    return this.cartService.findAll();
+  findAll(
+    @Query(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    query: GetCartDto,
+    @CurrentUser() user,
+  ) {
+    return this.cartService.findAll(query,user);
   }
 
   //?=======================================
-  //* @Docs   Admin can get single cart or user get his cart
-  //* @Route  GET /api/v1/product/cart/:id
+  //* @Docs   Admin can get single cart 
+  //* @Route  GET /api/v1/product/cart/:cartId
   //* @access Private(['admin','user'])
   //?=======================================
   @Get(':id')
-  @Roles(Role.Admin, Role.User)
+  @Roles(Role.Admin)
   @UseGuards(AuthGuard, RolesGuard)
-  findOne(@Param('id') id: string, @CurrentUser() user) {
-    return this.cartService.findOne(id, user);
+  findOne(@Param('id') id: string) {
+    return this.cartService.findOne(id);
   }
 
   //?=======================================
-  //* @Docs   User can update his cart
-  //* @Route  PATCH /api/v1/product/cart/:id
+  //* @Docs   User can apply a coupon in his cart
+  //* @Route  DELETE /api/v1/product/cart/coupon
+  //* @access Private(['user'])
+  //?=======================================
+  @Patch('coupon')
+  @Roles(Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  apllyCoupon(@Body(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    )
+    applyCoupon: ApplyCouponDto,@CurrentUser() user) {
+    return this.cartService.apllyCoupon(applyCoupon,user);
+  }
+  
+  //?=======================================
+  //* @Docs   User can update products in his cart
+  //* @Route  PATCH /api/v1/product/cart/:productId
   //* @access Private(['user'])
   //?=======================================
   @Patch(':id')
@@ -91,6 +122,18 @@ export class CartController {
 
   //?=======================================
   //* @Docs   User can delete his cart
+  //* @Route  DELETE /api/v1/product/cart
+  //* @access Private(['user'])
+  //?=======================================
+  @Delete()
+  @Roles(Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  removeCart(@CurrentUser() user) {
+    return this.cartService.removeCart(user);
+  }
+
+  //?=======================================
+  //* @Docs   User can delete a product in his cart
   //* @Route  DELETE /api/v1/product/cart/:id
   //* @access Private(['user'])
   //?=======================================
@@ -98,6 +141,8 @@ export class CartController {
   @Roles(Role.User)
   @UseGuards(AuthGuard, RolesGuard)
   remove(@Param('id') id: string, @CurrentUser() user) {
-    return this.cartService.remove(id, user);
+    return this.cartService.removeProduct(id, user);
   }
+
+
 }
