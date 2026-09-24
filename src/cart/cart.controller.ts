@@ -97,6 +97,18 @@ export class CartController {
     applyCoupon: ApplyCouponDto,@CurrentUser() user) {
     return this.cartService.apllyCoupon(applyCoupon,user);
   }
+
+  //?=======================================
+  //* @Docs   User can apply a coupon in his cart
+  //* @Route  DELETE /api/v1/product/cart/coupon
+  //* @access Private(['user'])
+  //?=======================================
+  @Delete('coupon')
+  @Roles(Role.User)
+  @UseGuards(AuthGuard, RolesGuard)
+  deleteCoupon(@CurrentUser() user) {
+    return this.cartService.removeCoupon(user);
+  }
   
   //?=======================================
   //* @Docs   User can update products in his cart

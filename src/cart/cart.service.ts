@@ -366,4 +366,33 @@ export class CartService {
       data: newCart,
     };
   }
+
+  async removeCoupon(user: { id: string; role: string }) {
+    //* Check if the user has a cart:
+    const cart = await this.carModel.findOne({ user: user.id });
+
+    if (!cart) {
+      throw new NotFoundException('The user does not have cart');
+    }
+
+    //* Check if the cart has a coupon:
+    if (!cart.coupons || cart.coupons.length === 0) {
+      throw new BadRequestException('No coupon applied to the cart');
+    }
+
+    //* Remove the applied coupon:
+    cart.coupons = [];
+
+    //* Reset the total price after discount:
+    cart.totalPriceAfterDiscount = cart.totalPrice;
+
+    //* Save the updated cart:
+    const newCart = await cart.save();
+
+    return {
+      status: 200,
+      message: 'Coupon removed successfully',
+      data: newCart,
+    };
+  }
 }
