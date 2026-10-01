@@ -11,23 +11,30 @@ export class OrderService {
     @InjectModel(Order.name) private readonly orderModel: Model<Order>,
   ) {}
 
-  create(createOrderDto: CreateOrderDto) {
+  async create(
+    createOrderDto: CreateOrderDto,
+    user: { id: string; role: string },
+  ) {
     return 'This action adds a new order';
   }
 
-  findAll() {
+  async findAll(user: { id: string; role: string }) {
     return `This action returns all order`;
   }
 
-  findOne(id: number) {
+  async findOne(id: string, user: { id: string; role: string }) {
     return `This action returns a #${id} order`;
   }
 
-  update(id: number, updateOrderDto: UpdateOrderDto) {
+  async update(
+    id: string,
+    updateOrderDto: UpdateOrderDto,
+    user: { id: string; role: string },
+  ) {
     return `This action updates a #${id} order`;
   }
 
-  remove(id: number) {
+  async remove(id: string, user: { id: string; role: string }) {
     return `This action removes a #${id} order`;
   }
 }
