@@ -7,6 +7,7 @@ import { Cart, CartSchema } from 'src/cart/cart.schema';
 import { User, UserSchema } from 'src/user/user.schema';
 import { Tax, TaxSchema } from 'src/tax/tax.schema';
 import { StripeModule } from 'src/stripe/stripe.module';
+import { Product, ProductSchema } from 'src/product/product.schema';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { StripeModule } from 'src/stripe/stripe.module';
       { name: Cart.name, schema: CartSchema },
       { name: User.name, schema: UserSchema },
       { name: Tax.name, schema: TaxSchema },
+      {name: Product.name, schema:ProductSchema}
     ]),
     StripeModule,
   ],
