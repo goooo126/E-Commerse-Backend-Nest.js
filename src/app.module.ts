@@ -16,11 +16,14 @@ import { ProductModule } from './product/product.module';
 import { ReviewModule } from './review/review.module';
 import { CartModule } from './cart/cart.module';
 import { OrderModule } from './order/order.module';
+import { StripeModule } from './stripe/stripe.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
-    MongooseModule.forRoot('mongodb://localhost:27017/ecommerce?replicaSet=rs0'),
+    ConfigModule.forRoot({ isGlobal: true }),
+    MongooseModule.forRoot(
+      'mongodb://localhost:27017/ecommerce?replicaSet=rs0',
+    ),
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,
@@ -53,6 +56,7 @@ import { OrderModule } from './order/order.module';
     ReviewModule,
     CartModule,
     OrderModule,
+    StripeModule,
   ],
 })
 export class AppModule {}

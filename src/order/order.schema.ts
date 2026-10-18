@@ -68,7 +68,7 @@ export class Order {
   //* PaymentMethod:
   @Prop({
     type: String,
-    default:'card',
+    default: 'card',
     enum: ['cash', 'card'],
     required: true,
   })
@@ -108,8 +108,8 @@ export class Order {
   //* address:
   @Prop({
     type: {
-      alis: String,
-      datils: String,
+      alias: String,
+      details: String,
       phone: String,
       city: String,
       postalCode: String,
@@ -124,6 +124,19 @@ export class Order {
     postalCode: string;
   };
   //* ==========================================================
+
+  @Prop({
+    type: String,
+    default: 'pending',
+    enum: ['pending', 'paid', 'failed'],
+  })
+  paymentStatus!: string;
+
+  @Prop({
+    type: String,
+    default: null,
+  })
+  stripeCheckoutSessionId?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
