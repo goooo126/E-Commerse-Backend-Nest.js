@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -15,6 +16,8 @@ import { Tax } from 'src/tax/tax.schema';
 import { StripeService } from 'src/stripe/stripe.service';
 import { ConfigService } from '@nestjs/config';
 import { Product } from 'src/product/product.schema';
+import { Role } from 'src/user/enums/roles.enum';
+import { GetOrderDto } from './dto/get-order.dto';
 
 @Injectable()
 export class OrderService {
@@ -252,23 +255,124 @@ export class OrderService {
     }
   }
 
-  async findAll(user: { id: string; role: string }) {
-    return `This action returns all order`;
+  async findAll(user: { id: string; role: string }, query: GetOrderDto) {
+    const { skip = 0, limit = 10 } = query;
+    //* admin: can get all orders.
+    if (user.role === Role.Admin) {
+      const [orders, total] = await Promise.all([
+        await this.orderModel.find().skip(skip).limit(limit),
+        await this.orderModel.countDocuments(),
+      ]);
+      return {
+        status: 200,
+        message: 'The order fetched successfully',
+        data: {
+          orders,
+          pagination: {
+            total,
+            limit,
+            skip,
+            returned: orders.length,
+          },
+        },
+      };
+    }
+
+    //* user
+    if (user.role === Role.User) {
+      const [orders, total] = await Promise.all([
+        await this.orderModel.find({ user: user.id }).skip(skip).limit(limit),
+        await this.orderModel.countDocuments({ user: user.id }),
+      ]);
+      return {
+        status: 200,
+        message: 'The order fetched successfully',
+        data: {
+          orders,
+          pagination: {
+            total,
+            limit,
+            skip,
+            returned: orders.length,
+          },
+        },
+      };
+    }
+
+    if (
+      user.role != Role.User.toString() ||
+      user.role !== Role.Admin.toString()
+    ) {
+      throw new BadRequestException('The Role is invalid');
+    }
   }
 
   async findOne(id: string, user: { id: string; role: string }) {
-    return `This action returns a #${id} order`;
+    const order = await this.orderModel.findById(id);
+
+    if (!order) {
+      throw new NotFoundException('The order is not found');
+    }
+    //* admin:
+    if (user.role === Role.Admin) {
+      return {
+        status: 200,
+        message: 'The order found',
+        data: order,
+      };
+    }
+
+    //* user
+    if (user.role === Role.User) {
+      //* check if the order owned by user
+      if (order.user === user.id) {
+        return {
+          status: 200,
+          message: 'The order found',
+          data: order,
+        };
+      }
+
+      throw new UnauthorizedException('This order is not belong to you');
+    }
+
+    if (
+      user.role != Role.User.toString() ||
+      user.role !== Role.Admin.toString()
+    ) {
+      throw new BadRequestException('The Role is invalid');
+    }
   }
 
-  async update(
+  async updateStatus(
     id: string,
     updateOrderDto: UpdateOrderDto,
     user: { id: string; role: string },
   ) {
-    return `This action updates a #${id} order`;
+    const order = await this.orderModel.findById(id);
+    if (!order) {
+      throw new NotFoundException('The order is not found');
+    }
+
+    const newOrder = await this.orderModel.findByIdAndUpdate(id, {
+      isPaid: updateOrderDto.isPaid,
+      paymentStatus: updateOrderDto.paymentStatus,
+      isDelivered: updateOrderDto.isDelivered,
+    });
+
+    return {
+      status: 200,
+      message: 'update the order successfully',
+      data: newOrder,
+    };
   }
 
-  async remove(id: string, user: { id: string; role: string }) {
-    return `This action removes a #${id} order`;
+  async remove(id: string, user: { id: string; role: string }): Promise<void> {
+    const order = await this.orderModel.findById(id);
+    if (!order || order.user != user.id) {
+      throw new NotFoundException('The order is not found');
+    }
+
+    await this.orderModel.findByIdAndDelete(id);
   }
 }
