@@ -17,6 +17,7 @@ import { ReviewModule } from './review/review.module';
 import { CartModule } from './cart/cart.module';
 import { OrderModule } from './order/order.module';
 import { StripeModule } from './stripe/stripe.module';
+import { UploadImagesModule } from './upload-images/upload-images.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { StripeModule } from './stripe/stripe.module';
     CartModule,
     OrderModule,
     StripeModule,
+    UploadImagesModule,
   ],
 })
 export class AppModule {}
