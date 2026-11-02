@@ -1,4 +1,4 @@
-import { Body, Controller, Post, ValidationPipe,Patch } from '@nestjs/common';
+import { Body, Controller, Post, ValidationPipe, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './Dto/signUp-auth.Dto';
 import { SignInDto } from './Dto/signIn-auth.Dto';
@@ -6,10 +6,15 @@ import {
   ForgetPasswordDto,
   ChangePassWordDto,
 } from './Dto/forgetPassword-auth.Dto';
+import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuthService } from './google.auth.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly authGoogleService: GoogleAuthService,
+  ) {}
 
   //?=======================================
   //* @Docs   Anyone can sign up and create new user
@@ -78,7 +83,7 @@ export class AuthController {
         transform: true,
       }),
     )
-    verifyCodeDto:ForgetPasswordDto,
+    verifyCodeDto: ForgetPasswordDto,
   ) {
     return this.authService.verifyCode(verifyCodeDto);
   }
@@ -96,8 +101,18 @@ export class AuthController {
         transform: true,
       }),
     )
-    changePasswordDto:ChangePassWordDto,
+    changePasswordDto: ChangePassWordDto,
   ) {
     return this.authService.changePassword(changePasswordDto);
+  }
+
+  //?=======================================
+  //* @Docs   any user can login or signup using google
+  //* @Route  POST /api/v1/auth/google
+  //* @access Public
+  //?=======================================
+  @Post('google')
+  loginWithGoogle(@Body('idToken') idToken: string) {
+    return this.authGoogleService.googleLogin(idToken);
   }
 }

@@ -1,0 +1,61 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Google Login Test</title>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <h2>Test Google Sign Up / Login</h2>
+
+  <div id="g_id_onload"
+       data-client_id="703914997302-f81p24oomp6ae9pe5a9ddmdmogal3u60.apps.googleusercontent.com"
+       data-callback="handleCredentialResponse">
+  </div>
+
+  <div class="g_id_signin"
+       data-type="standard"
+       data-size="large"
+       data-text="continue_with">
+  </div>
+
+  <p id="status"></p>
+
+  <script>
+    async function handleCredentialResponse(response) {
+      const idToken = response.credential;
+
+      document.getElementById('status').textContent =
+        'Google login succeeded. Sending token to NestJS...';
+
+      try {
+        const result = await fetch('http://localhost:3000/auth/google', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ idToken }),
+        });
+
+        const data = await result.json();
+
+        document.getElementById('status').textContent =
+          result.ok
+            ? 'Backend success! Check the console.'
+            : 'Backend error: ' + JSON.stringify(data);
+
+        // Display the response without exposing the JWT
+        console.log('Backend status:', result.status);
+        console.log('Backend response:', data);
+
+      } catch (error) {
+        document.getElementById('status').textContent =
+          'Request failed. Check NestJS and CORS.';
+        console.error(error);
+      }
+    }
+  </script>
+</body>
+</html>

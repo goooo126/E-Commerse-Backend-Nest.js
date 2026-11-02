@@ -33,6 +33,7 @@
     "class-validator": "^0.15.1",
     "cloudinary": "^2.11.0",
     "g": "^2.0.1",
+    "google-auth-library": "^11.3.2",
     "mongoose": "^9.9.3",
     "nodemailer": "^9.0.5",
     "payments": "^2.0.1404",
