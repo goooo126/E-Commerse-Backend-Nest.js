@@ -17,7 +17,7 @@ export class User {
   email!: string;
   @Prop({
     type: String,
-    required: true,
+    required: false,
     min: [3, 'Password Must at least 3 characters'],
     max: [20, 'Password Must at least 20 characters'],
   })
@@ -66,9 +66,22 @@ export class User {
 
   @Prop({
     type: String,
-    enum:['male','female']
+    enum: ['male', 'female'],
   })
   gender!: string;
+
+  @Prop({
+    type: String,
+    unique: true,
+    sparse: true,
+  })
+  googleId?: string;
+
+  @Prop({
+    type: Boolean,
+    default: false,
+  })
+  emailVerified!: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

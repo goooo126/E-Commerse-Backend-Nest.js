@@ -1,3 +1,4 @@
+import { Optional } from '@nestjs/common';
 import {
   IsBoolean,
   IsDate,
@@ -33,6 +34,7 @@ export class CreateUserDto {
   @IsString({ message: 'password must be string' })
   @MinLength(3, { message: 'password must be at least 3 characters' })
   @MaxLength(20, { message: 'password must at most 20 characters' })
+  @Optional()
   password!: string;
   //*=======================================
 
