@@ -1,0 +1,4256 @@
+diff --git a/nest-cli.json b/nest-cli.json
+index f9aa683..9026c8d 100644
+--- a/nest-cli.json
++++ b/nest-cli.json
+@@ -3,6 +3,21 @@
+   "collection": "@nestjs/schematics",
+   "sourceRoot": "src",
+   "compilerOptions": {
+-    "deleteOutDir": true
++    "deleteOutDir": true,
++    "plugins": [
++      {
++        "name": "@nestjs/swagger",
++        "options": {
++          "classValidatorShim": true,
++          "introspectComments": false,
++          "dtoFileNameSuffix": [
++            ".dto.ts",
++            ".Dto.ts",
++            "-dto.ts",
++            ".entity.ts"
++          ]
++        }
++      }
++    ]
+   }
+ }
+diff --git a/package.json b/package.json
+index 9466858..3232f69 100644
+--- a/package.json
++++ b/package.json
+@@ -28,6 +28,7 @@
+     "@nestjs/mapped-types": "*",
+     "@nestjs/mongoose": "^11.0.4",
+     "@nestjs/platform-express": "^11.0.1",
++    "@nestjs/swagger": "^11.4.7",
+     "bcrypt": "^6.0.0",
+     "class-transformer": "^0.5.1",
+     "class-validator": "^0.15.1",
+diff --git a/src/auth/Dto/forgetPassword-auth.Dto.ts b/src/auth/Dto/forgetPassword-auth.Dto.ts
+index 0af7c5e..f913dcb 100644
+--- a/src/auth/Dto/forgetPassword-auth.Dto.ts
++++ b/src/auth/Dto/forgetPassword-auth.Dto.ts
+@@ -1,13 +1,19 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import { IsDefined, IsEmail, IsNumber, IsOptional, IsString, Length, MaxLength, MinLength } from 'class-validator';
+ 
+ export class ForgetPasswordDto {
+   //* Email:
++  @ApiProperty({ description: 'Email of the registered account', example: 'ahmed.ali@example.com', format: 'email', minLength: 10 })
+   @IsEmail({}, { message: 'email must be string' })
+   @MinLength(10, { message: 'email must be at least 10 characters' })
+   email!: string;
+   //*=======================================
+ 
+    //* verificationCode:
++  @ApiPropertyOptional({
++    description: 'Not used by forget-password. Required in practice by verify-code (a missing/wrong code returns 403).',
++    example: 123456,
++  })
+   @IsNumber({}, { message: 'the code must be a number' })
+   @IsOptional()
+   verificationCode!: number;
+@@ -16,12 +22,14 @@ export class ForgetPasswordDto {
+ 
+ export class ChangePassWordDto {
+   //* Email:
++  @ApiProperty({ description: 'Email of the registered account', example: 'ahmed.ali@example.com', format: 'email', minLength: 10 })
+   @IsEmail({}, { message: 'email must be string' })
+   @MinLength(10, { message: 'email must be at least 10 characters' })
+   email!: string;
+   //*=======================================
+   
+   //* Password:
++   @ApiProperty({ description: 'New password (stored hashed)', example: 'N3wP@ssw0rd', minLength: 3, maxLength: 20 })
+    @IsString({ message: 'password must be string' })
+    @MinLength(3, { message: 'password must be at least 3 characters' })
+    @MaxLength(20, { message: 'password must at most 20 characters' })
+@@ -29,6 +37,10 @@ export class ChangePassWordDto {
+    //*=======================================
+ 
+     //* verificationCode:
++  @ApiPropertyOptional({
++    description: 'Not used by forget-password. Required in practice by verify-code (a missing/wrong code returns 403).',
++    example: 123456,
++  })
+   @IsNumber({}, { message: 'the code must be a number' })
+   @IsDefined()
+   verificationCode!: number;
+diff --git a/src/auth/Dto/google-auth-response.dto.ts b/src/auth/Dto/google-auth-response.dto.ts
+new file mode 100644
+index 0000000..94575d5
+--- /dev/null
++++ b/src/auth/Dto/google-auth-response.dto.ts
+@@ -0,0 +1,28 @@
++import { ApiProperty } from '@nestjs/swagger';
++import { EXAMPLE_OBJECT_ID } from 'src/common/swagger/swagger.helpers';
++
++export class GoogleAuthUserDto {
++  @ApiProperty({ example: EXAMPLE_OBJECT_ID, description: 'MongoDB ObjectId of the user' })
++  id!: string;
++
++  @ApiProperty({ example: 'Ahmed Ali' })
++  name!: string;
++
++  @ApiProperty({ example: 'ahmed.ali@example.com' })
++  email!: string;
++}
++
++/** POST /auth/google response – NOT wrapped in the usual { status, message, data } envelope */
++export class GoogleAuthResponseDto {
++  @ApiProperty({ example: 'Google authentication successful' })
++  message!: string;
++
++  @ApiProperty({
++    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhOGIyNDY5In0.signature',
++    description: 'Application JWT (send it as `Authorization: Bearer <token>`). The role in the token is always `user`.',
++  })
++  token!: string;
++
++  @ApiProperty({ type: GoogleAuthUserDto })
++  user!: GoogleAuthUserDto;
++}
+diff --git a/src/auth/Dto/signIn-auth.Dto.ts b/src/auth/Dto/signIn-auth.Dto.ts
+index c284735..3fc0a17 100644
+--- a/src/auth/Dto/signIn-auth.Dto.ts
++++ b/src/auth/Dto/signIn-auth.Dto.ts
+@@ -1,13 +1,16 @@
++import { ApiProperty } from '@nestjs/swagger';
+ import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+ 
+ export class SignInDto {
+   //* Email:
++  @ApiProperty({ description: 'Email of the registered account', example: 'ahmed.ali@example.com', format: 'email', minLength: 10 })
+   @IsEmail({}, { message: 'email must be string' })
+   @MinLength(10, { message: 'email must be at least 10 characters' })
+   email!: string;
+   //*=======================================
+ 
+   //* Password:
++  @ApiProperty({ description: 'Account password', example: 'P@ssw0rd123', minLength: 3, maxLength: 20 })
+   @IsString({ message: 'password must be string' })
+   @MinLength(3, { message: 'password must be at least 3 characters' })
+   @MaxLength(20, { message: 'password must at most 20 characters' })
+diff --git a/src/auth/Dto/signUp-auth.Dto.ts b/src/auth/Dto/signUp-auth.Dto.ts
+index 668c611..5d143d5 100644
+--- a/src/auth/Dto/signUp-auth.Dto.ts
++++ b/src/auth/Dto/signUp-auth.Dto.ts
+@@ -1,7 +1,9 @@
++import { ApiProperty } from '@nestjs/swagger';
+ import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+ 
+ export class SignUpDto {
+   //* Name:
++  @ApiProperty({ description: 'Full name', example: 'Ahmed Ali', minLength: 3, maxLength: 30 })
+   @IsString({ message: 'name must be string' })
+   @MinLength(3, { message: 'name must be at least 3 characters' })
+   @MaxLength(30, { message: 'name must at most 30 characters' })
+@@ -9,12 +11,14 @@ export class SignUpDto {
+   //*=======================================
+ 
+   //* Email:
++  @ApiProperty({ description: 'Unique email address', example: 'ahmed.ali@example.com', format: 'email', minLength: 10 })
+   @IsEmail({}, { message: 'email must be string' })
+   @MinLength(10, { message: 'email must be at least 10 characters' })
+   email!: string;
+   //*=======================================
+ 
+   //* Password:
++  @ApiProperty({ description: 'Account password (stored hashed)', example: 'P@ssw0rd123', minLength: 3, maxLength: 20 })
+   @IsString({ message: 'password must be string' })
+   @MinLength(3, { message: 'password must be at least 3 characters' })
+   @MaxLength(20, { message: 'password must at most 20 characters' })
+diff --git a/src/auth/auth.controller.ts b/src/auth/auth.controller.ts
+index be558ad..4c51b21 100644
+--- a/src/auth/auth.controller.ts
++++ b/src/auth/auth.controller.ts
+@@ -8,7 +8,20 @@ import {
+ } from './Dto/forgetPassword-auth.Dto';
+ import { GoogleAuth } from 'google-auth-library';
+ import { GoogleAuthService } from './google.auth.service';
++import {
++  ApiBody,
++  ApiOperation,
++  ApiResponse,
++  ApiTags,
++} from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++} from 'src/common/swagger/swagger.helpers';
++import { UserResponseDto } from 'src/user/dto/user-response.dto';
++import { GoogleAuthResponseDto } from './Dto/google-auth-response.dto';
+ 
++@ApiTags('Auth')
+ @Controller('auth')
+ export class AuthController {
+   constructor(
+@@ -21,6 +34,20 @@ export class AuthController {
+   //* @Route  POST /api/v1/auth/sign-up
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'Register a new account',
++    description:
++      'Creates a new user with role `user` (active) and returns the user plus a JWT. **Access:** Public. The password is hashed; it is never returned.',
++  })
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 200,
++    description: 'User created. The HTTP status is 201 but the `status` field in the body is 200.',
++    message: 'User Created sucessfully :)',
++    model: UserResponseDto,
++    extra: { access_token: { type: 'string', description: 'JWT to send as `Authorization: Bearer <token>`', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhOGIyNDY5In0.signature' } },
++  })
++  @ApiErrors(400, [409, 'Conflict – the email already exists (`Email already exists`)'])
+   @Post('sign-up')
+   signUp(
+     @Body(
+@@ -39,6 +66,24 @@ export class AuthController {
+   //* @Route  POST /api/v1/auth/sign-in
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'Sign in with email and password',
++    description:
++      'Authenticates a user and returns the user plus a JWT. **Access:** Public. Note: an unknown email returns 409 (not 404), an inactive account returns 403 and a wrong password returns 400.',
++  })
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 200,
++    description: 'Signed in. The HTTP status is 201 but the `status` field in the body is 200.',
++    message: 'User Logedin sucessfully :)',
++    model: UserResponseDto,
++    extra: { access_token: { type: 'string', description: 'JWT to send as `Authorization: Bearer <token>`', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhOGIyNDY5In0.signature' } },
++  })
++  @ApiErrors(
++    [400, 'Bad Request – validation failed, or the password is wrong (`Email or Password is incorrect`)'],
++    [403, 'Forbidden – the account is not active'],
++    [409, 'Conflict – no user with this email (`The User is not Found`)'],
++  )
+   @Post('sign-in')
+   signIn(
+     @Body(
+@@ -57,6 +102,23 @@ export class AuthController {
+   //* @Route  POST /api/v1/auth/forget-password
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'Request a password-reset code',
++    description:
++      'Generates a 6-digit code, stores it on the user with a 15-minute expiry and emails it. **Access:** Public. Only `email` is used (a `verificationCode` in the body is ignored). Calling it again replaces the previous code.',
++  })
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 200,
++    description: 'Code sent. The HTTP status is 201 but the `status` field in the body is 200.',
++    message: 'The code sended to the email',
++  })
++  @ApiErrors(
++    400,
++    [403, 'Forbidden – the account is not active'],
++    [409, 'Conflict – no user with this email (`The User is not Found`)'],
++    [500, 'Internal Server Error – e.g. the email could not be sent'],
++  )
+   @Post('forget-password')
+   forgetPassword(
+     @Body(
+@@ -75,6 +137,32 @@ export class AuthController {
+   //* @Route  POST /api/v1/auth/verify-code
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'Verify a password-reset code',
++    description:
++      'Checks the 6-digit code previously sent by forget-password. **Access:** Public. The code is valid for 15 minutes; after that the endpoint returns 400 `The code is expired :(`. A wrong or missing code returns 403 (same as an inactive account). The code is not consumed by this call.',
++  })
++  @ApiBody({
++    schema: {
++      type: 'object',
++      required: ['email', 'verificationCode'],
++      properties: {
++        email: { type: 'string', format: 'email', minLength: 10, example: 'ahmed.ali@example.com' },
++        verificationCode: { type: 'number', description: 'The 6-digit code received by email', example: 123456 },
++      },
++    },
++  })
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 200,
++    description: 'Code is valid. The HTTP status is 201 but the `status` field in the body is 200.',
++    message: 'Code is Valid :)',
++  })
++  @ApiErrors(
++    [400, 'Bad Request – validation failed, or the code is expired (`The code is expired :(`)'],
++    [403, 'Forbidden – wrong or missing code, or the account is not active'],
++    [409, 'Conflict – no user with this email (`The User is not Found`)'],
++  )
+   @Post('verify-code')
+   verifyCode(
+     @Body(
+@@ -93,6 +181,21 @@ export class AuthController {
+   //* @Route  POST /api/v1/auth/change-password
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'Reset the password using a code',
++    description:
++      'Sets a new password after validating the 6-digit code from forget-password. **Access:** Public. The code expires 15 minutes after it was issued (400 `The code is expired :(`); a wrong code returns 403. On success the stored code is reset to 0.',
++  })
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'Password changed.',
++    message: 'Password is Changed successfully try to sign in again :)',
++  })
++  @ApiErrors(
++    [400, 'Bad Request – validation failed, or the code is expired (`The code is expired :(`)'],
++    [403, 'Forbidden – wrong code, or the account is not active'],
++    [409, 'Conflict – no user with this email (`The User is not Found`)'],
++  )
+   @Patch('change-password')
+   changePassword(
+     @Body(
+@@ -111,6 +214,25 @@ export class AuthController {
+   //* @Route  POST /api/v1/auth/google
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'Sign in / sign up with Google',
++    description:
++      'Verifies a Google ID token. If no account is linked to the Google id, a new Google-only user (role `user`, email verified) is created; then an application JWT is returned. **Access:** Public. The response is NOT wrapped in the usual `{ status, message, data }` envelope.',
++  })
++  @ApiBody({
++    schema: {
++      type: 'object',
++      required: ['idToken'],
++      properties: {
++        idToken: { type: 'string', description: 'Google ID token obtained from Google Sign-In on the client', example: 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMyJ9.eyJzdWIiOiIxMDgyMzQ1Njc4OTAifQ.signature' },
++      },
++    },
++  })
++  @ApiResponse({ status: 201, description: 'Authenticated with Google', type: GoogleAuthResponseDto })
++  @ApiErrors(
++    [401, 'Unauthorized – missing/invalid Google ID token, or the Google email is not verified'],
++    [409, 'Conflict – the email is already registered locally; sign in with email/password instead'],
++  )
+   @Post('google')
+   loginWithGoogle(@Body('idToken') idToken: string) {
+     return this.authGoogleService.googleLogin(idToken);
+diff --git a/src/brand/brand.controller.ts b/src/brand/brand.controller.ts
+index bf7abb0..0943cb7 100644
+--- a/src/brand/brand.controller.ts
++++ b/src/brand/brand.controller.ts
+@@ -18,7 +18,16 @@ import { Role } from 'src/user/enums/roles.enum';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
+ import { GetBrandsDto } from './dto/get-brands-dto';
++import { BrandResponseDto } from './dto/brand-response.dto';
++import { ApiOperation, ApiTags } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
+ 
++@ApiTags('Brand')
+ @Controller('brand')
+ export class BrandController {
+   constructor(private readonly brandService: BrandService) {}
+@@ -29,6 +38,20 @@ export class BrandController {
+   //* @access Private['amdin']
+   //?=======================================
+   @Post()
++  @ApiOperation({
++    summary: 'Create a brand',
++    description:
++      'Creates a new brand. **Access:** Admin (Bearer token required). The name must be unique (400 otherwise). The optional URL is sent in the `email` property (despite its name it must be a valid URL). Known quirk: the service responds with HTTP 201 but the JSON body `status` is 200, and `data` is a boolean (result of `isSelected`) instead of the created brand.',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 200,
++    description: 'Brand created. Note: `data` is a boolean, not the brand document',
++    message: 'The Brand created Successfully :)',
++    data: { type: 'boolean', example: true, description: 'Result of `isSelected("-__V")`, not the created brand' },
++  })
++  @ApiErrors(400)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   create(
+@@ -49,6 +72,18 @@ export class BrandController {
+   //* @access Public
+   //?=======================================
+   @Get()
++  @ApiOperation({
++    summary: 'List brands',
++    description:
++      'Returns a paginated list of brands. Defaults: limit=10, skip=0. **Access:** Public.',
++  })
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'Paginated brands',
++    message: 'Brands fetched successfully',
++    list: { key: 'brands', model: BrandResponseDto },
++  })
++  @ApiErrors(400)
+   findAll(@Query(new ValidationPipe({
+     whitelist: true,
+     transform: true,
+@@ -62,6 +97,19 @@ export class BrandController {
+   //* @access Public
+   //?=======================================
+   @Get(':id')
++  @ApiOperation({
++    summary: 'Get a brand by id',
++    description:
++      'Returns a single brand. **Access:** Public.',
++  })
++  @ApiMongoIdParam('id', 'ObjectId of the brand')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The brand',
++    message: 'The Brand founded successfully',
++    model: BrandResponseDto,
++  })
++  @ApiErrors(400, 404)
+   findOne(@Param('id') id: string) {
+     return this.brandService.findOne(id);
+   }
+@@ -72,6 +120,20 @@ export class BrandController {
+   //* @access Private['amdin']
+   //?=======================================
+   @Patch(':id')
++  @ApiOperation({
++    summary: 'Update a brand',
++    description:
++      'Partially updates a brand (all body fields are optional). **Access:** Admin (Bearer token required). A changed name must stay unique (400). The URL is sent in the `email` property (it is a URL despite the name).',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the brand')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The updated brand',
++    message: 'The brand is updated successfully',
++    model: BrandResponseDto,
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   update(@Param('id') id: string, @Body(new ValidationPipe({
+@@ -87,6 +149,19 @@ export class BrandController {
+   //* @access Private['amdin']
+   //?=======================================
+   @Delete(':id')
++  @ApiOperation({
++    summary: 'Delete a brand',
++    description:
++      'Deletes a brand. **Access:** Admin (Bearer token required). The response contains no data.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the brand')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'Brand deleted',
++    message: 'The Brand is delete successfully :(',
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   remove(@Param('id') id: string) {
+diff --git a/src/brand/dto/brand-response.dto.ts b/src/brand/dto/brand-response.dto.ts
+new file mode 100644
+index 0000000..8e3cc24
+--- /dev/null
++++ b/src/brand/dto/brand-response.dto.ts
+@@ -0,0 +1,13 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
++import { BaseDocumentDto } from 'src/common/swagger/swagger.helpers';
++
++export class BrandResponseDto extends BaseDocumentDto {
++  @ApiProperty({ description: 'Brand name', example: 'Samsung' })
++  name!: string;
++
++  @ApiPropertyOptional({
++    description: 'Brand image URL',
++    example: 'https://example.com/images/samsung.png',
++  })
++  image?: string;
++}
+diff --git a/src/brand/dto/create-brand.dto.ts b/src/brand/dto/create-brand.dto.ts
+index 8f00d8e..bbd7da0 100644
+--- a/src/brand/dto/create-brand.dto.ts
++++ b/src/brand/dto/create-brand.dto.ts
+@@ -1,7 +1,14 @@
++import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+ import { IsDefined, IsOptional, IsString, IsUrl, MaxLength, MinLength } from "class-validator";
+ 
+ export class CreateBrandDto {
+     //* Name
++    @ApiProperty({
++        description: "Brand name (must be unique)",
++        example: "Samsung",
++        minLength: 3,
++        maxLength: 100,
++    })
+     @IsString({message:"The Name must be string"})
+     @MinLength(3,{message:"The Name must at least 3 characters"})
+     @MaxLength(100,{message:"The Name must at most 100 charaters"})
+@@ -10,6 +17,12 @@ export class CreateBrandDto {
+     //* -------------------------------------------------
+ 
+     //* Email
++    @ApiPropertyOptional({
++        description:
++            "Despite its name, must be a valid URL (it is stored in the brand `image` field)",
++        example: "https://example.com/images/samsung.png",
++        format: "uri",
++    })
+     @IsUrl({},{message:"The Name must be valid Url"})
+     @IsOptional()
+     email!:string;
+diff --git a/src/brand/dto/get-brands-dto.ts b/src/brand/dto/get-brands-dto.ts
+index a3141e8..eb240f3 100644
+--- a/src/brand/dto/get-brands-dto.ts
++++ b/src/brand/dto/get-brands-dto.ts
+@@ -1,13 +1,28 @@
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { Type } from 'class-transformer';
+ import { IsInt, IsOptional, Min } from 'class-validator';
+ 
+ export class GetBrandsDto {
++  @ApiPropertyOptional({
++    description: 'Maximum number of documents to return (page size)',
++    type: Number,
++    default: 10,
++    minimum: 1,
++    example: 10,
++  })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+   limit?: number = 10;
+ 
++  @ApiPropertyOptional({
++    description: 'Number of documents to skip',
++    type: Number,
++    default: 0,
++    minimum: 0,
++    example: 0,
++  })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+diff --git a/src/brand/dto/update-brand.dto.ts b/src/brand/dto/update-brand.dto.ts
+index 634ab2d..db19aea 100644
+--- a/src/brand/dto/update-brand.dto.ts
++++ b/src/brand/dto/update-brand.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateBrandDto } from './create-brand.dto';
+ 
+ export class UpdateBrandDto extends PartialType(CreateBrandDto) {}
+diff --git a/src/cart/cart.controller.ts b/src/cart/cart.controller.ts
+index 8ecb615..395e251 100644
+--- a/src/cart/cart.controller.ts
++++ b/src/cart/cart.controller.ts
+@@ -10,6 +10,20 @@ import {
+   ValidationPipe,
+   Query,
+ } from '@nestjs/common';
++import {
++  ApiExtraModels,
++  ApiOperation,
++  ApiResponse,
++  ApiTags,
++  getSchemaPath,
++} from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
++import { CartResponseDto } from './dto/cart-response.dto';
+ import { CartService } from './cart.service';
+ import { CreateCartDto } from './dto/create-cart.dto';
+ import { UpdateCartDto } from './dto/update-cart.dto';
+@@ -22,6 +36,7 @@ import { GetCartDto } from './dto/get-cart.dto';
+ import { User } from 'src/user/user.schema';
+ import { ApplyCouponDto } from './dto/apply-coupon.dto';
+ 
++@ApiTags('Cart')
+ @Controller('cart')
+ export class CartController {
+   constructor(private readonly cartService: CartService) {}
+@@ -31,6 +46,24 @@ export class CartController {
+   //* @Route  POST /api/v1/cart
+   //* @access Private(['user'])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Add a product to the cart',
++    description:
++      'Adds a product to the authenticated user\'s cart. **Access:** User only. If the user has no cart yet a new one is created; otherwise the product is appended (or its quantity is increased when it is already in the cart) and the totals are updated. The product must exist and have at least the requested quantity in stock. `quantity` defaults to 1 and `color` to an empty string. The HTTP status is always 201; the `status` field in the body is 200 when added to an existing cart and 201 when a new cart was created.',
++  })
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 201,
++    description:
++      'Product added. Body `status` is 201 for a newly created cart (message "The Product added successfully") or 200 when added to an existing cart (message "The product added successfully")',
++    message: 'The Product added successfully',
++    model: CartResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed (invalid product id, quantity not an integer >= 1, color not a string)'],
++    [404, 'The product is not found or the requested quantity is unavailable'],
++  )
++  @ApiPrivate('user')
+   @Post()
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -52,6 +85,61 @@ export class CartController {
+   //* @Route  GET /api/v1/product/cart
+   //* @access Private(['admin',user])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Get carts',
++    description:
++      'Admin: returns a paginated list of all carts (with `user` populated as name/email), filterable by `minTotalPrice`/`maxTotalPrice` and sorted by `totalPrice` (`order`, default asc; `limit` default 10, `skip` default 0). User: returns the user\'s own cart (query params are ignored) or 404 when the user has no cart. **Access:** Admin, User. The shape of `data` depends on the role.',
++  })
++  @ApiExtraModels(CartResponseDto)
++  @ApiResponse({
++    status: 200,
++    description:
++      'Admin receives `data: { carts, pagination }`; user receives `data: <cart>`',
++    schema: {
++      oneOf: [
++        {
++          type: 'object',
++          description: 'Admin response',
++          properties: {
++            status: { type: 'number', example: 200 },
++            message: { type: 'string', example: 'carts fetched successfully' },
++            data: {
++              type: 'object',
++              properties: {
++                carts: {
++                  type: 'array',
++                  items: { $ref: getSchemaPath(CartResponseDto) },
++                },
++                pagination: {
++                  type: 'object',
++                  properties: {
++                    total: { type: 'number', example: 42 },
++                    limit: { type: 'number', example: 10 },
++                    skip: { type: 'number', example: 0 },
++                    returned: { type: 'number', example: 10 },
++                  },
++                },
++              },
++            },
++          },
++        },
++        {
++          type: 'object',
++          description: 'User response',
++          properties: {
++            status: { type: 'number', example: 200 },
++            message: { type: 'string', example: 'Cart fetched successfully' },
++            data: { $ref: getSchemaPath(CartResponseDto) },
++          },
++        },
++      ],
++    },
++  })
++  @ApiErrors(
++    [400, 'Validation failed (limit, skip, minTotalPrice, maxTotalPrice must be numbers)'],
++    [404, 'The user has no cart (user role only)'],
++  )
++  @ApiPrivate('admin', 'user')
+   @Get()
+   @Roles(Role.Admin,Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -73,6 +161,22 @@ export class CartController {
+   //* @Route  GET /api/v1/product/cart/:cartId
+   //* @access Private(['admin','user'])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Get a cart by id',
++    description:
++      'Returns a single cart by its id, with `cartItems.product` populated (title, imageCover, price) and `user` populated (name). **Access:** Admin only.',
++  })
++  @ApiMongoIdParam('id', 'Cart id')
++  @ApiEnvelopeResponse({
++    description: 'The cart',
++    message: 'The cart is founed',
++    model: CartResponseDto,
++  })
++  @ApiErrors(
++    [400, 'The cart id is not a valid ObjectId'],
++    [404, 'The cart is not found'],
++  )
++  @ApiPrivate('admin')
+   @Get(':id')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -85,6 +189,21 @@ export class CartController {
+   //* @Route  DELETE /api/v1/product/cart/coupon
+   //* @access Private(['user'])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Apply a coupon to the cart',
++    description:
++      'Applies a coupon (by name) to the user\'s cart and recalculates `totalPriceAfterDiscount = totalPrice - totalPrice * discount / 100`. **Access:** User only. Only one coupon can be applied at a time, and expired coupons are rejected.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Coupon applied; returns the updated cart',
++    message: 'the coupon is applied successfully',
++    model: CartResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed, a coupon is already applied, or the coupon is expired'],
++    [404, 'The user does not have a cart, or the coupon does not exist'],
++  )
++  @ApiPrivate('user')
+   @Patch('coupon')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -103,6 +222,21 @@ export class CartController {
+   //* @Route  DELETE /api/v1/product/cart/coupon
+   //* @access Private(['user'])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Remove the applied coupon',
++    description:
++      'Removes the coupon from the user\'s cart and resets `totalPriceAfterDiscount` to `totalPrice`. **Access:** User only.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Coupon removed; returns the updated cart',
++    message: 'Coupon removed successfully',
++    model: CartResponseDto,
++  })
++  @ApiErrors(
++    [400, 'No coupon applied to the cart'],
++    [404, 'The user does not have a cart'],
++  )
++  @ApiPrivate('user')
+   @Delete('coupon')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -115,6 +249,22 @@ export class CartController {
+   //* @Route  PATCH /api/v1/product/cart/:productId
+   //* @access Private(['user'])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Update a product in the cart',
++    description:
++      'Updates the quantity and/or color of a product already in the user\'s cart. **Access:** User only. The `id` path parameter is the PRODUCT id (not the cart id). When `quantity` is sent it must not exceed the product stock; totals are then recalculated from current product prices (any applied coupon discount is NOT re-applied: `totalPriceAfterDiscount` is reset to `totalPrice`). Only `quantity` and `color` are used; a `product` field in the body is ignored.',
++  })
++  @ApiMongoIdParam('id', 'Product id inside the cart')
++  @ApiEnvelopeResponse({
++    description: 'Cart updated; returns the updated cart',
++    message: 'Update the cart successfully',
++    model: CartResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed, or the requested quantity exceeds the available stock'],
++    [404, 'The cart or the product is not found, or the product is not in the cart'],
++  )
++  @ApiPrivate('user')
+   @Patch(':id')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -137,6 +287,14 @@ export class CartController {
+   //* @Route  DELETE /api/v1/product/cart
+   //* @access Private(['user'])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Delete the whole cart',
++    description:
++      'Deletes the authenticated user\'s entire cart. **Access:** User only. Returns HTTP 200 with an empty body.',
++  })
++  @ApiResponse({ status: 200, description: 'Cart deleted (empty body)' })
++  @ApiErrors([404, 'The cart is not found'])
++  @ApiPrivate('user')
+   @Delete()
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -149,6 +307,19 @@ export class CartController {
+   //* @Route  DELETE /api/v1/product/cart/:id
+   //* @access Private(['user'])
+   //?=======================================
++  @ApiOperation({
++    summary: 'Remove a product from the cart',
++    description:
++      'Removes one product from the user\'s cart and recalculates the totals (`totalPriceAfterDiscount` is reset to `totalPrice`). **Access:** User only. The `id` path parameter is the PRODUCT id (not the cart id).',
++  })
++  @ApiMongoIdParam('id', 'Product id inside the cart')
++  @ApiEnvelopeResponse({
++    description: 'Product removed; returns the updated cart',
++    message: 'The Product is delete successfully',
++    model: CartResponseDto,
++  })
++  @ApiErrors([404, "The user doesn't have a cart, or the product is not in the cart"])
++  @ApiPrivate('user')
+   @Delete(':id')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+diff --git a/src/cart/dto/apply-coupon.dto.ts b/src/cart/dto/apply-coupon.dto.ts
+index 254541e..0bd5b82 100644
+--- a/src/cart/dto/apply-coupon.dto.ts
++++ b/src/cart/dto/apply-coupon.dto.ts
+@@ -1,7 +1,14 @@
++import { ApiProperty } from '@nestjs/swagger';
+ import { IsDefined, IsString, MaxLength, MinLength } from "class-validator";
+ 
+ export class ApplyCouponDto {
+   //* Name:
++  @ApiProperty({
++    description: 'Name of the coupon to apply',
++    example: 'SUMMER25',
++    minLength: 3,
++    maxLength: 100,
++  })
+   @IsString({ message: 'the name of coupon must be string' })
+   @MinLength(3, { message: 'The Coupon must at least 3 characters' })
+   @MaxLength(100, { message: 'The Coupon must at most 100 characters' })
+diff --git a/src/cart/dto/cart-response.dto.ts b/src/cart/dto/cart-response.dto.ts
+new file mode 100644
+index 0000000..d76da9c
+--- /dev/null
++++ b/src/cart/dto/cart-response.dto.ts
+@@ -0,0 +1,75 @@
++import {
++  ApiExtraModels,
++  ApiProperty,
++  ApiPropertyOptional,
++  getSchemaPath,
++} from '@nestjs/swagger';
++import {
++  BaseDocumentDto,
++  EXAMPLE_OBJECT_ID,
++} from 'src/common/swagger/swagger.helpers';
++
++export class CartItemResponseDto {
++  @ApiProperty({
++    description:
++      'Product id (ObjectId). Populated as { _id, title, imageCover, price } only by GET /cart/{id} (admin)',
++    example: EXAMPLE_OBJECT_ID,
++  })
++  product!: string;
++
++  @ApiProperty({ description: 'Quantity of this product in the cart', example: 2, minimum: 1 })
++  quantity!: number;
++
++  @ApiProperty({ description: 'Selected color (empty string when none)', example: 'black' })
++  color!: string;
++}
++
++export class CartCouponResponseDto {
++  @ApiProperty({ description: 'Coupon name', example: 'SUMMER25' })
++  name!: string;
++
++  @ApiProperty({ description: 'Coupon id (ObjectId)', example: EXAMPLE_OBJECT_ID })
++  id!: string;
++}
++
++export class CartUserSummaryDto {
++  @ApiProperty({ description: 'User id', example: EXAMPLE_OBJECT_ID })
++  _id!: string;
++
++  @ApiProperty({ description: 'User name', example: 'Ahmed Ali' })
++  name!: string;
++
++  @ApiPropertyOptional({
++    description: 'User email (populated in the admin list GET /cart only)',
++    example: 'ahmed@example.com',
++  })
++  email?: string;
++}
++
++@ApiExtraModels(CartUserSummaryDto)
++export class CartResponseDto extends BaseDocumentDto {
++  @ApiProperty({ type: () => [CartItemResponseDto], description: 'Products in the cart' })
++  cartItems!: CartItemResponseDto[];
++
++  @ApiProperty({ description: 'Sum of price * quantity of all items', example: 1500 })
++  totalPrice!: number;
++
++  @ApiProperty({
++    description: 'Total after the applied coupon discount (equals totalPrice when no coupon)',
++    example: 1125,
++  })
++  totalPriceAfterDiscount!: number;
++
++  @ApiProperty({
++    type: () => [CartCouponResponseDto],
++    description: 'Applied coupons (at most one)',
++  })
++  coupons!: CartCouponResponseDto[];
++
++  @ApiProperty({
++    description:
++      'Owner of the cart: an ObjectId string, or a populated { _id, name[, email] } object in admin endpoints',
++    oneOf: [{ type: 'string', example: EXAMPLE_OBJECT_ID }, { $ref: getSchemaPath(CartUserSummaryDto) }],
++  })
++  user!: string | CartUserSummaryDto;
++}
+diff --git a/src/cart/dto/create-cart.dto.ts b/src/cart/dto/create-cart.dto.ts
+index 61f1d54..1b761e3 100644
+--- a/src/cart/dto/create-cart.dto.ts
++++ b/src/cart/dto/create-cart.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import {
+   IsDefined,
+   IsInt,
+@@ -9,6 +10,10 @@ import {
+ 
+ export class CreateCartDto {
+   //* Product
++  @ApiProperty({
++    description: 'Id of the product to add',
++    example: '6a8b2469abf9629023788337',
++  })
+   @IsDefined({
+     message: 'The product id is required',
+   })
+@@ -18,6 +23,13 @@ export class CreateCartDto {
+   product!: string;
+ 
+   //* Quantity
++  @ApiPropertyOptional({
++    description: 'Quantity to add',
++    example: 1,
++    default: 1,
++    minimum: 1,
++    type: Number,
++  })
+   @IsOptional()
+   @IsInt({
+     message: 'The quantity must be an integer number',
+@@ -28,6 +40,11 @@ export class CreateCartDto {
+   quantity: number =1;
+ 
+   //* Color
++  @ApiPropertyOptional({
++    description: 'Selected color of the product',
++    example: 'black',
++    default: '',
++  })
+   @IsOptional()
+   @IsString({
+     message: 'The color must be a string',
+diff --git a/src/cart/dto/get-cart.dto.ts b/src/cart/dto/get-cart.dto.ts
+index 884b31a..5a8bd56 100644
+--- a/src/cart/dto/get-cart.dto.ts
++++ b/src/cart/dto/get-cart.dto.ts
+@@ -1,27 +1,38 @@
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { Type } from 'class-transformer';
+ import { IsNumber, IsOptional, IsString } from 'class-validator';
+ 
+ export class GetCartDto {
++  @ApiPropertyOptional({ description: 'Max number of carts to return (admin only)', example: 10, default: 10 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   limit?: number;
+ 
++  @ApiPropertyOptional({ description: 'Number of carts to skip (admin only)', example: 0, default: 0 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   skip?: number;
+ 
++  @ApiPropertyOptional({ description: 'Only carts with totalPrice >= this value (admin only)', example: 100 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   minTotalPrice?: number;
+ 
++  @ApiPropertyOptional({ description: 'Only carts with totalPrice <= this value (admin only)', example: 5000 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   maxTotalPrice?: number;
+ 
++  @ApiPropertyOptional({
++    description: 'Sort direction by totalPrice (admin only)',
++    enum: ['asc', 'desc'],
++    default: 'asc',
++    example: 'asc',
++  })
+   @IsOptional()
+   @IsString()
+   order?: 'asc' | 'desc';
+diff --git a/src/cart/dto/update-cart.dto.ts b/src/cart/dto/update-cart.dto.ts
+index a3f4103..f1d500b 100644
+--- a/src/cart/dto/update-cart.dto.ts
++++ b/src/cart/dto/update-cart.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateCartDto } from './create-cart.dto';
+ 
+ export class UpdateCartDto extends PartialType(CreateCartDto) {}
+diff --git a/src/category/category.controller.ts b/src/category/category.controller.ts
+index d55bcfb..44a97d2 100644
+--- a/src/category/category.controller.ts
++++ b/src/category/category.controller.ts
+@@ -16,7 +16,17 @@ import { Roles } from 'src/user/decorator/roles.decorator';
+ import { Role } from 'src/user/enums/roles.enum';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
++import { CategoryResponseDto } from './dto/category-response.dto';
++import { SubCategoryRefResponseDto } from 'src/sub-category/dto/sub-category-response.dto';
++import { ApiExtraModels, ApiOperation, ApiTags, getSchemaPath } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
+ 
++@ApiTags('Category')
+ @Controller('category')
+ export class CategoryController {
+   constructor(private readonly categoryService: CategoryService) {}
+@@ -27,6 +37,19 @@ export class CategoryController {
+   //* @access Private[admin]
+   //?=======================================
+   @Post()
++  @ApiOperation({
++    summary: 'Create a category',
++    description:
++      'Creates a new category. **Access:** Admin (Bearer token required). The name must be unique (400 if a category with the same name already exists). The optional image must be a valid URL.',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    status: 201,
++    description: 'Category created',
++    message: 'The category is created successfully :)',
++    model: CategoryResponseDto,
++  })
++  @ApiErrors(400)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   create(
+@@ -47,6 +70,18 @@ export class CategoryController {
+   //* @access Public
+   //?=======================================
+   @Get()
++  @ApiOperation({
++    summary: 'List all categories',
++    description:
++      'Returns all categories (no pagination). **Access:** Public.',
++  })
++  @ApiExtraModels(CategoryResponseDto)
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'List of categories',
++    message: 'Get All Categories successfully :)',
++    data: { type: 'array', items: { $ref: getSchemaPath(CategoryResponseDto) } },
++  })
+   findAll() {
+     return this.categoryService.findAll();
+   }
+@@ -57,6 +92,21 @@ export class CategoryController {
+   //* @access Public
+   //?=======================================
+   @Get(':categoryId/subCategories')
++  @ApiOperation({
++    summary: 'List sub-categories of a category',
++    description:
++      'Returns all sub-categories that belong to the given category. The response also contains a top-level `length` with the number of sub-categories. **Access:** Public.',
++  })
++  @ApiMongoIdParam('categoryId', 'ObjectId of the category')
++  @ApiExtraModels(SubCategoryRefResponseDto)
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'Sub-categories of the category',
++    message: 'subCategories founded successfully',
++    data: { type: 'array', items: { $ref: getSchemaPath(SubCategoryRefResponseDto) } },
++    extra: { length: { type: 'number', example: 3, description: 'Number of sub-categories returned' } },
++  })
++  @ApiErrors(400, 404)
+   findSubCategories(@Param('categoryId') categoryId: string) {
+     return this.categoryService.findSubCategories(categoryId);
+   }
+@@ -67,6 +117,19 @@ export class CategoryController {
+   //* @access Public
+   //?=======================================
+   @Get(':id')
++  @ApiOperation({
++    summary: 'Get a category by id',
++    description:
++      'Returns a single category. **Access:** Public.',
++  })
++  @ApiMongoIdParam('id', 'ObjectId of the category')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The category',
++    message: 'The Category is founed Successfully',
++    model: CategoryResponseDto,
++  })
++  @ApiErrors(400, 404)
+   findOne(@Param('id') id: string) {
+     return this.categoryService.findOne(id);
+   }
+@@ -77,6 +140,20 @@ export class CategoryController {
+   //* @access Private['admin']
+   //?=======================================
+   @Patch(':id')
++  @ApiOperation({
++    summary: 'Update a category',
++    description:
++      'Partially updates a category (all body fields are optional). **Access:** Admin (Bearer token required). Note: the name uniqueness is NOT re-checked on update.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the category')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The updated category',
++    message: 'The Category is updated successfully',
++    model: CategoryResponseDto,
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   update(
+@@ -98,6 +175,19 @@ export class CategoryController {
+   //* @access Private ['admin']
+   //?=======================================
+   @Delete(':id')
++  @ApiOperation({
++    summary: 'Delete a category',
++    description:
++      'Deletes a category and also deletes ALL sub-categories that belong to it. **Access:** Admin (Bearer token required). The response contains no data.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the category')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'Category (and its sub-categories) deleted',
++    message: 'the category is deleted successfully :)',
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard,RolesGuard)
+   remove(@Param('id') id: string) {
+diff --git a/src/category/dto/category-response.dto.ts b/src/category/dto/category-response.dto.ts
+new file mode 100644
+index 0000000..0b7844d
+--- /dev/null
++++ b/src/category/dto/category-response.dto.ts
+@@ -0,0 +1,13 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
++import { BaseDocumentDto } from 'src/common/swagger/swagger.helpers';
++
++export class CategoryResponseDto extends BaseDocumentDto {
++  @ApiProperty({ description: 'Category name', example: 'Electronics' })
++  name!: string;
++
++  @ApiPropertyOptional({
++    description: 'Category image URL',
++    example: 'https://example.com/images/electronics.png',
++  })
++  image?: string;
++}
+diff --git a/src/category/dto/create-category.dto.ts b/src/category/dto/create-category.dto.ts
+index 1af0245..0510079 100644
+--- a/src/category/dto/create-category.dto.ts
++++ b/src/category/dto/create-category.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import {
+   IsOptional,
+   IsString,
+@@ -9,6 +10,12 @@ import {
+ 
+ export class CreateCategoryDto {
+   //* Name
++  @ApiProperty({
++    description: 'Category name (must be unique)',
++    example: 'Electronics',
++    minLength: 3,
++    maxLength: 30,
++  })
+   @IsString({ message: 'The Category name must be string' })
+   @MinLength(3, { message: 'The Min Length for category name is 3 characters' })
+   @MaxLength(30, {
+@@ -18,6 +25,11 @@ export class CreateCategoryDto {
+   //* ----------------------------------------------------
+ 
+   //* image
++  @ApiPropertyOptional({
++    description: 'Category image URL',
++    example: 'https://example.com/images/electronics.png',
++    format: 'uri',
++  })
+   @IsString({ message: 'The Image must be string' })
+   @IsUrl({}, { message: 'The image Url must be vaild url' })
+   @IsOptional()
+diff --git a/src/category/dto/update-category.dto.ts b/src/category/dto/update-category.dto.ts
+index 1ace9d9..d713b9b 100644
+--- a/src/category/dto/update-category.dto.ts
++++ b/src/category/dto/update-category.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateCategoryDto } from './create-category.dto';
+ 
+ export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {}
+diff --git a/src/common/swagger/swagger.helpers.ts b/src/common/swagger/swagger.helpers.ts
+new file mode 100644
+index 0000000..9c2ba39
+--- /dev/null
++++ b/src/common/swagger/swagger.helpers.ts
+@@ -0,0 +1,205 @@
++import { applyDecorators, Type } from '@nestjs/common';
++import {
++  ApiBearerAuth,
++  ApiExtraModels,
++  ApiParam,
++  ApiProperty,
++  ApiPropertyOptional,
++  ApiResponse,
++  getSchemaPath,
++} from '@nestjs/swagger';
++
++/** Name of the Bearer security scheme registered in main.ts */
++export const BEARER_AUTH_NAME = 'access-token';
++
++/** A realistic MongoDB ObjectId used in examples */
++export const EXAMPLE_OBJECT_ID = '6a8b2469abf9629023788337';
++
++type SchemaLike = Record<string, any>;
++
++//?=======================================
++//* Shared response models
++//?=======================================
++
++/** Fields Mongoose adds to every document (timestamps: true) */
++export class BaseDocumentDto {
++  @ApiProperty({ example: EXAMPLE_OBJECT_ID, description: 'MongoDB ObjectId' })
++  _id!: string;
++
++  @ApiProperty({ example: '2026-11-03T10:15:30.000Z', type: String, format: 'date-time' })
++  createdAt!: Date;
++
++  @ApiProperty({ example: '2026-11-03T10:15:30.000Z', type: String, format: 'date-time' })
++  updatedAt!: Date;
++}
++
++export class PaginationDto {
++  @ApiProperty({ example: 42, description: 'Total documents matching the filter' })
++  total!: number;
++
++  @ApiProperty({ example: 10, description: 'Page size used' })
++  limit!: number;
++
++  @ApiProperty({ example: 0, description: 'Number of documents skipped' })
++  skip!: number;
++
++  @ApiProperty({ example: 10, description: 'Number of documents in this response' })
++  returned!: number;
++}
++
++/** Shape of every error thrown through Nest exceptions */
++export class ErrorResponseDto {
++  @ApiProperty({ example: 400 })
++  statusCode!: number;
++
++  @ApiProperty({
++    oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
++    example: 'Validation failed',
++    description:
++      'A single message, or an array of messages when class-validator rejects the body/query',
++  })
++  message!: string | string[];
++
++  @ApiPropertyOptional({ example: 'Bad Request' })
++  error?: string;
++}
++
++/** Envelope without a data payload */
++export class MessageResponseDto {
++  @ApiProperty({ example: 200 })
++  status!: number;
++
++  @ApiProperty({ example: 'Done successfully' })
++  message!: string;
++}
++
++//?=======================================
++//* Decorators
++//?=======================================
++
++export interface EnvelopeOptions {
++  /** Real HTTP status code (POST defaults to 201 in Nest, others 200) */
++  status?: number;
++  /** The numeric `status` field written in the JSON body by the service */
++  bodyStatus?: number;
++  description: string;
++  /** Example of the `message` field */
++  message: string;
++  /** data = <model> */
++  model?: Type<unknown>;
++  /** data = { <key>: <model> } */
++  wrap?: { key: string; model: Type<unknown> };
++  /** data = { <key>: <model>[], pagination } */
++  list?: { key: string; model: Type<unknown> };
++  /** data = custom schema */
++  data?: SchemaLike;
++  /** extra top-level properties next to status/message/data (e.g. access_token) */
++  extra?: Record<string, SchemaLike>;
++  /** Do not output a `status` property (some endpoints return only message) */
++  noStatus?: boolean;
++}
++
++/**
++ * Documents the `{ status, message, data }` envelope used by this API.
++ */
++export function ApiEnvelopeResponse(options: EnvelopeOptions) {
++  const httpStatus = options.status ?? 200;
++  const bodyStatus = options.bodyStatus ?? httpStatus;
++  const models: Type<unknown>[] = [];
++
++  let data: SchemaLike | undefined;
++  if (options.model) {
++    models.push(options.model);
++    data = { $ref: getSchemaPath(options.model) };
++  } else if (options.wrap) {
++    models.push(options.wrap.model);
++    data = {
++      type: 'object',
++      properties: {
++        [options.wrap.key]: { $ref: getSchemaPath(options.wrap.model) },
++      },
++    };
++  } else if (options.list) {
++    models.push(options.list.model, PaginationDto);
++    data = {
++      type: 'object',
++      properties: {
++        [options.list.key]: {
++          type: 'array',
++          items: { $ref: getSchemaPath(options.list.model) },
++        },
++        pagination: { $ref: getSchemaPath(PaginationDto) },
++      },
++    };
++  } else if (options.data) {
++    data = options.data;
++  }
++
++  const properties: Record<string, SchemaLike> = {};
++  if (!options.noStatus) {
++    properties.status = { type: 'number', example: bodyStatus };
++  }
++  properties.message = { type: 'string', example: options.message };
++  if (data) properties.data = data;
++  Object.assign(properties, options.extra ?? {});
++
++  return applyDecorators(
++    ApiExtraModels(...models),
++    ApiResponse({
++      status: httpStatus,
++      description: options.description,
++      schema: { type: 'object', properties },
++    }),
++  );
++}
++
++const DEFAULT_ERROR_DESCRIPTIONS: Record<number, string> = {
++  400: 'Bad Request – validation failed, malformed ObjectId, or a business rule was violated',
++  401: 'Unauthorized – missing/invalid/expired Bearer token, or the role is not allowed',
++  403: 'Forbidden',
++  404: 'Not Found',
++  409: 'Conflict – the resource already exists',
++  500: 'Internal Server Error',
++};
++
++/**
++ * Adds error responses (all use ErrorResponseDto).
++ * Pass a code, or [code, description] to override the default description.
++ */
++export function ApiErrors(...errors: Array<number | [number, string]>) {
++  return applyDecorators(
++    ApiExtraModels(ErrorResponseDto),
++    ...errors.map((e) => {
++      const [code, description] = Array.isArray(e)
++        ? e
++        : [e, DEFAULT_ERROR_DESCRIPTIONS[e] ?? 'Error'];
++      return ApiResponse({ status: code, description, type: ErrorResponseDto });
++    }),
++  );
++}
++
++/**
++ * Marks an endpoint as protected by AuthGuard (+ RolesGuard).
++ * NOTE: RolesGuard throws 401 (not 403) when the role is not allowed.
++ */
++export function ApiPrivate(...roles: Array<'user' | 'admin'>) {
++  const who = roles.length ? ` Allowed roles: ${roles.join(', ')}.` : '';
++  return applyDecorators(
++    ApiBearerAuth(BEARER_AUTH_NAME),
++    ApiResponse({
++      status: 401,
++      description: `Unauthorized – missing/invalid/expired Bearer token, or the role is not allowed.${who}`,
++      type: ErrorResponseDto,
++    }),
++  );
++}
++
++/** Path parameter holding a MongoDB ObjectId */
++export function ApiMongoIdParam(name = 'id', description = 'MongoDB ObjectId') {
++  return ApiParam({
++    name,
++    description,
++    type: String,
++    example: EXAMPLE_OBJECT_ID,
++  });
++}
+diff --git a/src/coupon/coupon.controller.ts b/src/coupon/coupon.controller.ts
+index 06bdac5..c84fc87 100644
+--- a/src/coupon/coupon.controller.ts
++++ b/src/coupon/coupon.controller.ts
+@@ -18,7 +18,16 @@ import { Role } from 'src/user/enums/roles.enum';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
+ import { GetCouponsDto } from './dto/get-coupon-dto';
++import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
++import { CouponResponseDto } from './dto/coupon-response.dto';
+ 
++@ApiTags('Coupon')
+ @Controller('coupon')
+ export class CouponController {
+   constructor(private readonly couponService: CouponService) {}
+@@ -28,6 +37,23 @@ export class CouponController {
+   //* @Route  POST /api/v1/coupon
+   //* @access Private['amdin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Create a coupon',
++    description:
++      'Creates a new discount coupon. **Access:** Admin. The coupon name must be unique and the expiration date must be in the future. The response body contains the misspelled key `statuse` (instead of `status`).',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    status: 201,
++    noStatus: true,
++    description: 'Coupon created',
++    message: 'Coupon is create successfully :)',
++    model: CouponResponseDto,
++    extra: { statuse: { type: 'number', example: 201 } },
++  })
++  @ApiErrors(
++    [400, 'Validation failed, the coupon name already exists, or the expiration date is not in the future (\'Coupon has expired\')'],
++  )
+   @Post()
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -48,6 +74,19 @@ export class CouponController {
+   //* @Route  GET /api/v1/coupon
+   //* @access Private['amdin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'List coupons',
++    description:
++      'Returns a paginated list of coupons with optional filters and sorting. **Access:** Admin. Defaults: limit 10, skip 0, sorted by createdAt descending. Note: the `discount` filter defaults to 0, so when it is omitted only coupons with discount 0 are matched; `expireDate` cannot currently be used from the query string.',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    description: 'Coupons fetched',
++    message: 'coupons fetched successfully',
++    bodyStatus: 200,
++    list: { key: 'coupons', model: CouponResponseDto },
++  })
++  @ApiErrors([400, 'Invalid query parameters'])
+   @Get()
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -68,6 +107,18 @@ export class CouponController {
+   //* @Route  GET /api/v1/coupon/:id
+   //* @access Private['amdin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Get a coupon by id',
++    description: 'Returns a single coupon. **Access:** Admin.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'Coupon ObjectId')
++  @ApiEnvelopeResponse({
++    description: 'Coupon found',
++    message: 'The coupon is founded successfully',
++    model: CouponResponseDto,
++  })
++  @ApiErrors([400, 'Invalid ObjectId'], [404, 'Coupon not found'])
+   @Get(':id')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -80,6 +131,23 @@ export class CouponController {
+   //* @Route  PATCH /api/v1/coupon/:id
+   //* @access Private['amdin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Update a coupon',
++    description:
++      'Partially updates a coupon (all body fields optional). **Access:** Admin. A new name must not be used by another coupon (the service answers 502 Bad Gateway in that case) and a new expiration date must be in the future.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'Coupon ObjectId')
++  @ApiEnvelopeResponse({
++    description: 'Coupon updated',
++    message: 'The Coupon is updated successfully',
++    model: CouponResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed, invalid ObjectId, or the expiration date is not in the future'],
++    [404, 'Coupon not found'],
++    [502, 'Another coupon already uses this name (Bad Gateway is thrown by the service)'],
++  )
+   @Patch(':id')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -101,6 +169,14 @@ export class CouponController {
+   //* @Route  DELETE /api/v1/coupon/:id
+   //* @access Private['amdin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Delete a coupon',
++    description: 'Deletes a coupon permanently. **Access:** Admin. Returns HTTP 200 with an empty body.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'Coupon ObjectId')
++  @ApiResponse({ status: 200, description: 'Coupon deleted (empty body)' })
++  @ApiErrors([400, 'Invalid ObjectId'], [404, 'Coupon not found'])
+   @Delete(':id')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+diff --git a/src/coupon/dto/coupon-response.dto.ts b/src/coupon/dto/coupon-response.dto.ts
+new file mode 100644
+index 0000000..503d8cd
+--- /dev/null
++++ b/src/coupon/dto/coupon-response.dto.ts
+@@ -0,0 +1,18 @@
++import { ApiProperty } from '@nestjs/swagger';
++import { BaseDocumentDto } from 'src/common/swagger/swagger.helpers';
++
++export class CouponResponseDto extends BaseDocumentDto {
++  @ApiProperty({ description: 'Unique coupon name / code', example: 'SUMMER2027' })
++  name!: string;
++
++  @ApiProperty({
++    description: 'Expiration date',
++    example: '2027-12-31T23:59:59.000Z',
++    type: String,
++    format: 'date-time',
++  })
++  expireDate!: Date;
++
++  @ApiProperty({ description: 'Discount percentage (0-90)', example: 15, minimum: 0, maximum: 90 })
++  discount!: number;
++}
+diff --git a/src/coupon/dto/create-coupon.dto.ts b/src/coupon/dto/create-coupon.dto.ts
+index 9f60523..b0255bf 100644
+--- a/src/coupon/dto/create-coupon.dto.ts
++++ b/src/coupon/dto/create-coupon.dto.ts
+@@ -1,8 +1,10 @@
+ import { Type } from "class-transformer";
++import { ApiProperty } from "@nestjs/swagger";
+ import { IsDate, IsDefined, IsNumber, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+ 
+ export class CreateCouponDto {
+     //* Name:
++    @ApiProperty({ description: "Unique coupon name / code", example: "SUMMER2027", minLength: 3, maxLength: 100 })
+     @IsString({message:"the name of coupon must be string"})
+     @MinLength(3,{message:"The Coupon must at least 3 characters"})
+     @MaxLength(100,{message:"The Coupon must at most 100 characters"})
+@@ -10,6 +12,7 @@ export class CreateCouponDto {
+     //*-----------------------------------------------
+ 
+     //* expireDate:
++    @ApiProperty({ description: "Expiration date (ISO 8601). Must be in the future, otherwise the request fails with 400 'Coupon has expired'", example: "2027-12-31T23:59:59.000Z", type: String, format: "date-time" })
+     @IsDate({message:"exipreDate must be valid date"})
+     @IsDefined()
+     @Type(() => Date)
+@@ -18,6 +21,7 @@ export class CreateCouponDto {
+ 
+ 
+     //* discount:
++    @ApiProperty({ description: "Discount percentage", example: 15, minimum: 0, maximum: 90 })
+     @IsNumber({},{message:"The discount must be number"})
+     @Min(0,{message:"Discount must be 0 or larger"})
+     @Max(90,{message:"Discoun must be 90 or lower"})
+diff --git a/src/coupon/dto/get-coupon-dto.ts b/src/coupon/dto/get-coupon-dto.ts
+index 24c5a0c..be022f2 100644
+--- a/src/coupon/dto/get-coupon-dto.ts
++++ b/src/coupon/dto/get-coupon-dto.ts
+@@ -1,36 +1,44 @@
+ import { Type } from 'class-transformer';
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { IsDate, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+ 
+ export class GetCouponsDto {
++  @ApiPropertyOptional({ description: 'Maximum number of coupons to return (page size)', default: 10, minimum: 1, example: 10 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+   limit?: number = 10;
+ 
++  @ApiPropertyOptional({ description: 'Number of coupons to skip (offset)', default: 0, minimum: 0, example: 0 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(0)
+   skip?: number = 0;
+ 
++  @ApiPropertyOptional({ description: 'Field to sort by', enum: ['name', 'createdAt', 'expireDate', 'discount'], default: 'createdAt' })
+   @IsOptional()
+   @IsString()
+   @IsIn(['name', 'createdAt', 'expireDate', 'discount'])
+   sort?: string = 'createdAt';
+ 
++  @ApiPropertyOptional({ description: 'Sort direction', enum: ['asc', 'desc'], default: 'desc' })
+   @IsOptional()
+   @IsIn(['asc', 'desc'])
+   order?: string = 'desc';
+ 
++  @ApiPropertyOptional({ description: 'Filter by coupon name (case-insensitive partial match)', example: 'summer' })
+   @IsOptional()
+   @IsString()
+   name?: string;
+ 
++  @ApiPropertyOptional({ description: 'Filter by exact expiration date (currently cannot be used from the query string: the value is not transformed to a Date, so validation always fails)', type: String, format: 'date-time', example: '2027-12-31T23:59:59.000Z' })
+   @IsOptional()
+   @IsDate()
+   expireDate?: Date;
+ 
++  @ApiPropertyOptional({ description: 'Filter by exact discount percentage. NOTE: because the default is 0 and the service filters whenever the value is defined, omitting it filters coupons with discount = 0', default: 0, minimum: 0, example: 15 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+diff --git a/src/coupon/dto/update-coupon.dto.ts b/src/coupon/dto/update-coupon.dto.ts
+index c8dc033..deca52b 100644
+--- a/src/coupon/dto/update-coupon.dto.ts
++++ b/src/coupon/dto/update-coupon.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateCouponDto } from './create-coupon.dto';
+ 
+ export class UpdateCouponDto extends PartialType(CreateCouponDto) {}
+diff --git a/src/main.ts b/src/main.ts
+index 7370ea3..1ff94dd 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -1,5 +1,7 @@
+ import { NestFactory } from '@nestjs/core';
++import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+ import { AppModule } from './app.module';
++import { BEARER_AUTH_NAME } from './common/swagger/swagger.helpers';
+ 
+ async function bootstrap() {
+   const app = await NestFactory.create(AppModule, { rawBody: true });
+@@ -8,6 +10,45 @@ async function bootstrap() {
+     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+     allowedHeaders: ['Content-Type', 'Authorization'],
+   });
++
++  //?=======================================
++  //* Swagger / OpenAPI
++  //* UI:   GET /docs
++  //* JSON: GET /docs-json
++  //?=======================================
++  const swaggerConfig = new DocumentBuilder()
++    .setTitle('E-Commerce API')
++    .setDescription(
++      [
++        'REST API for the E-Commerce backend (NestJS + MongoDB).',
++        '',
++        '**Authentication:** call `POST /auth/sign-in` (or `/auth/sign-up`, `/auth/google`), ' +
++          'copy the `access_token` from the response, click **Authorize** and paste it.',
++        '',
++        '**Roles:** `user` and `admin`. A wrong role returns `401` (not `403`).',
++        '',
++        '**Success envelope:** most endpoints return `{ status, message, data }`.',
++        '',
++        '**Errors:** `{ statusCode, message, error }` – `message` is an array when validation fails.',
++      ].join('\n'),
++    )
++    .setVersion('1.0')
++    .addBearerAuth(
++      {
++        type: 'http',
++        scheme: 'bearer',
++        bearerFormat: 'JWT',
++        description: 'JWT returned by the auth endpoints',
++      },
++      BEARER_AUTH_NAME,
++    )
++    .build();
++
++  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
++  SwaggerModule.setup('docs', app, swaggerDocument, {
++    swaggerOptions: { persistAuthorization: true },
++  });
++
+   await app.listen(3000);
+ }
+ bootstrap();
+diff --git a/src/order/dto/create-order.dto.ts b/src/order/dto/create-order.dto.ts
+index 24ed77b..bbd93c2 100644
+--- a/src/order/dto/create-order.dto.ts
++++ b/src/order/dto/create-order.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import { Type } from 'class-transformer';
+ import {
+   IsEnum,
+@@ -8,22 +9,27 @@ import {
+   ValidateNested,
+ } from 'class-validator';
+ export class AddressDto {
++  @ApiProperty({ description: 'Address label', example: 'Home' })
+   @IsString()
+   @IsNotEmpty()
+   alias!: string;
+ 
++  @ApiProperty({ description: 'Address details', example: 'Fayoum, Egypt' })
+   @IsString()
+   @IsNotEmpty()
+   details!: string;
+ 
++  @ApiProperty({ description: 'Contact phone number', example: '01000000000' })
+   @IsString()
+   @IsNotEmpty()
+   phone!: string;
+ 
++  @ApiProperty({ description: 'City', example: 'Fayoum' })
+   @IsString()
+   @IsNotEmpty()
+   city!: string;
+ 
++  @ApiProperty({ description: 'Postal code', example: '63511' })
+   @IsString()
+   @IsNotEmpty()
+   postalCode!: string;
+@@ -31,6 +37,13 @@ export class AddressDto {
+ 
+ export class CreateOrderDto {
+   //* paymentMethod:
++  @ApiPropertyOptional({
++    description:
++      'Payment method. `card` creates a Stripe Checkout session, `cash` creates the order directly',
++    enum: ['card', 'cash'],
++    default: 'card',
++    example: 'card',
++  })
+   @IsString({ message: 'The payment method must be string' })
+   @IsEnum(['card', 'cash'], {
+     message: 'The payment method must be cash or card',
+@@ -40,6 +53,10 @@ export class CreateOrderDto {
+   //* =========================================
+ 
+   //* address
++  @ApiProperty({
++    type: () => AddressDto,
++    description: 'Shipping address',
++  })
+   @IsObject()
+   @ValidateNested()
+   @Type(() => AddressDto)
+diff --git a/src/order/dto/get-order.dto.ts b/src/order/dto/get-order.dto.ts
+index 94f9656..93e26b2 100644
+--- a/src/order/dto/get-order.dto.ts
++++ b/src/order/dto/get-order.dto.ts
+@@ -1,12 +1,15 @@
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { Type } from 'class-transformer';
+ import { IsNumber, IsOptional } from 'class-validator';
+ 
+ export class GetOrderDto {
++  @ApiPropertyOptional({ description: 'Max number of orders to return', example: 10, default: 10 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   limit?: number;
+ 
++  @ApiPropertyOptional({ description: 'Number of orders to skip', example: 0, default: 0 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+diff --git a/src/order/dto/order-response.dto.ts b/src/order/dto/order-response.dto.ts
+new file mode 100644
+index 0000000..e618051
+--- /dev/null
++++ b/src/order/dto/order-response.dto.ts
+@@ -0,0 +1,108 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
++import {
++  BaseDocumentDto,
++  EXAMPLE_OBJECT_ID,
++} from 'src/common/swagger/swagger.helpers';
++
++export class OrderItemResponseDto {
++  @ApiProperty({ description: 'Product id (ObjectId)', example: EXAMPLE_OBJECT_ID })
++  product!: string;
++
++  @ApiProperty({ description: 'Ordered quantity', example: 2, minimum: 1 })
++  quantity!: number;
++
++  @ApiProperty({ description: 'Selected color (empty string when none)', example: 'black' })
++  color!: string;
++}
++
++export class OrderAddressResponseDto {
++  @ApiProperty({ description: 'Address label', example: 'Home' })
++  alias!: string;
++
++  @ApiProperty({ description: 'Address details', example: 'Fayoum, Egypt' })
++  details!: string;
++
++  @ApiProperty({ description: 'Contact phone number', example: '01000000000' })
++  phone!: string;
++
++  @ApiProperty({ description: 'City', example: 'Fayoum' })
++  city!: string;
++
++  @ApiProperty({ description: 'Postal code', example: '63511' })
++  postalCode!: string;
++}
++
++export class OrderResponseDto extends BaseDocumentDto {
++  @ApiProperty({ description: 'Id of the user who owns the order', example: EXAMPLE_OBJECT_ID })
++  user!: string;
++
++  @ApiProperty({ type: () => [OrderItemResponseDto], description: 'Snapshot of the cart items at order time' })
++  cartItems!: OrderItemResponseDto[];
++
++  @ApiProperty({ description: 'Tax price (from the `productTax` configuration)', example: 50, default: 0 })
++  taxPrice!: number;
++
++  @ApiProperty({ description: 'Shipping price (from the `shippingTax` configuration)', example: 30, default: 0 })
++  shippingPrice!: number;
++
++  @ApiProperty({
++    description: 'cart.totalPriceAfterDiscount + taxPrice + shippingPrice (EGP)',
++    example: 1205,
++  })
++  totalOrderPrice!: number;
++
++  @ApiProperty({ enum: ['cash', 'card'], default: 'card', example: 'card' })
++  paymentMethod!: string;
++
++  @ApiProperty({ description: 'Whether the order has been paid', example: false, default: false })
++  isPaid!: boolean;
++
++  @ApiPropertyOptional({
++    description: 'When the order was paid (set by the Stripe webhook)',
++    type: String,
++    format: 'date-time',
++    example: '2026-11-03T10:20:00.000Z',
++  })
++  paidAt?: Date;
++
++  @ApiProperty({ description: 'Whether the order has been delivered', example: false, default: false })
++  isDelivered!: boolean;
++
++  @ApiPropertyOptional({
++    description: 'When the order was delivered (property name is spelled "deleviredAt" in the schema)',
++    type: String,
++    format: 'date-time',
++    example: '2026-11-05T12:00:00.000Z',
++  })
++  deleviredAt?: Date;
++
++  @ApiProperty({ type: () => OrderAddressResponseDto, description: 'Shipping address' })
++  address!: OrderAddressResponseDto;
++
++  @ApiProperty({ enum: ['pending', 'paid', 'failed'], default: 'pending', example: 'pending' })
++  paymentStatus!: string;
++
++  @ApiPropertyOptional({
++    description: 'Stripe Checkout Session id (card payments only)',
++    example: 'cs_test_a1B2c3D4e5F6g7H8i9J0',
++    nullable: true,
++  })
++  stripeCheckoutSessionId?: string | null;
++}
++
++export class CheckoutSessionResponseDto {
++  @ApiProperty({ description: 'Id of the newly created (pending) order', example: EXAMPLE_OBJECT_ID })
++  orderId!: string;
++
++  @ApiProperty({ description: 'Payment status of the order', example: 'pending', enum: ['pending', 'paid', 'failed'] })
++  paymentStatus!: string;
++
++  @ApiProperty({
++    description: 'Stripe Checkout URL: the client must redirect the user here to pay',
++    example: 'https://checkout.stripe.com/c/pay/cs_test_a1B2c3D4e5F6g7H8i9J0',
++  })
++  checkoutUrl!: string;
++
++  @ApiProperty({ description: 'Stripe Checkout Session id', example: 'cs_test_a1B2c3D4e5F6g7H8i9J0' })
++  sessionId!: string;
++}
+diff --git a/src/order/dto/update-order.dto.ts b/src/order/dto/update-order.dto.ts
+index 25f746c..a45ff31 100644
+--- a/src/order/dto/update-order.dto.ts
++++ b/src/order/dto/update-order.dto.ts
+@@ -1,17 +1,29 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+ import { CreateOrderDto } from './create-order.dto';
+ import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+ 
++/**
++ * Body of PATCH /order/:id/status.
++ * Only `paymentStatus`, `isPaid` and `isDelivered` are applied by the service;
++ * the inherited `paymentMethod` and `address` are accepted but ignored.
++ */
+ export class UpdateOrderDto extends PartialType(CreateOrderDto) {
++    @ApiPropertyOptional({
++      description: 'New payment status',
++      enum: ['pending', 'paid', 'failed'],
++      example: 'paid',
++    })
+     @IsOptional()
+     @IsString({message:"The payment status must be string"})
+     @IsEnum(['pending','paid','failed'],{message:"The paymentStauts must be in the enum"})
+     paymentStatus!:string
+ 
++    @ApiPropertyOptional({ description: 'Mark the order as paid / unpaid', example: true })
+     @IsOptional()
+     @IsBoolean({message:"The is paid must be boolean"})
+     isPaid!:boolean;
+ 
++    @ApiPropertyOptional({ description: 'Mark the order as delivered / not delivered', example: true })
+     @IsOptional()
+     @IsBoolean({message:"The is Delivered must be boolean"})
+     isDelivered!:boolean;
+diff --git a/src/order/order.controller.ts b/src/order/order.controller.ts
+index 9999c27..9fa07bd 100644
+--- a/src/order/order.controller.ts
++++ b/src/order/order.controller.ts
+@@ -10,6 +10,23 @@ import {
+   ValidationPipe,
+   Query,
+ } from '@nestjs/common';
++import {
++  ApiExtraModels,
++  ApiOperation,
++  ApiResponse,
++  ApiTags,
++  getSchemaPath,
++} from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
++import {
++  CheckoutSessionResponseDto,
++  OrderResponseDto,
++} from './dto/order-response.dto';
+ import { OrderService } from './order.service';
+ import { CreateOrderDto } from './dto/create-order.dto';
+ import { UpdateOrderDto } from './dto/update-order.dto';
+@@ -20,6 +37,7 @@ import { RolesGuard } from 'src/user/guard/role.guard';
+ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+ import { GetOrderDto } from './dto/get-order.dto';
+ 
++@ApiTags('Orders')
+ @Controller('order')
+ export class OrderController {
+   constructor(private readonly orderService: OrderService) {}
+@@ -29,6 +47,45 @@ export class OrderController {
+   //* @Route  POST /api/v1/order
+   //* @access Private['user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Create an order from the cart',
++    description:
++      'Creates an order from the authenticated user\'s cart. **Access:** User only. The total is computed on the server: `cart.totalPriceAfterDiscount + productTax + shippingTax`. With `paymentMethod: "cash"` the order is created immediately, stock is deducted and the cart is deleted. With `paymentMethod: "card"` (default) a pending order and a Stripe Checkout session (currency EGP) are created: the client MUST redirect the user to `data.checkoutUrl`; the order is marked paid, stock deducted and the cart cleared later by the Stripe webhook. If the checkout session cannot be created the pending order is deleted. The two response shapes are described under `data`.',
++  })
++  @ApiExtraModels(OrderResponseDto, CheckoutSessionResponseDto)
++  @ApiResponse({
++    status: 201,
++    description:
++      'Order created. `data` is the order for cash payments, or the checkout session info for card payments',
++    schema: {
++      oneOf: [
++        {
++          type: 'object',
++          description: 'paymentMethod = cash',
++          properties: {
++            status: { type: 'number', example: 201 },
++            message: { type: 'string', example: 'The order was created successfully' },
++            data: { $ref: getSchemaPath(OrderResponseDto) },
++          },
++        },
++        {
++          type: 'object',
++          description: 'paymentMethod = card (redirect the user to data.checkoutUrl)',
++          properties: {
++            status: { type: 'number', example: 201 },
++            message: { type: 'string', example: 'Checkout session created successfully' },
++            data: { $ref: getSchemaPath(CheckoutSessionResponseDto) },
++          },
++        },
++      ],
++    },
++  })
++  @ApiErrors(
++    [400, 'Validation failed, address missing, cart empty/invalid total, invalid payment method, or insufficient stock (cash)'],
++    [404, 'The user has no cart, the user was not found, or the tax/shipping configuration was not found'],
++    [500, 'FRONTEND_URL is not configured, or Stripe did not return a checkout URL'],
++  )
++  @ApiPrivate('user')
+   @Post()
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -50,6 +107,18 @@ export class OrderController {
+   //* @Route  GET /api/v1/order
+   //* @access Private['user','admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'List orders',
++    description:
++      'Returns a paginated list of orders. **Access:** Admin, User. Admin gets all orders; a user gets only their own orders. `limit` defaults to 10 and `skip` to 0.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Paginated orders',
++    message: 'The order fetched successfully',
++    list: { key: 'orders', model: OrderResponseDto },
++  })
++  @ApiErrors([400, 'Validation failed (limit and skip must be numbers)'])
++  @ApiPrivate('admin', 'user')
+   @Get()
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -71,6 +140,22 @@ export class OrderController {
+   //* @Route  GET /api/v1/order/:id
+   //* @access Private['user','admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Get an order by id',
++    description:
++      'Returns a single order. **Access:** Admin (any order), User (own orders only; otherwise 401).',
++  })
++  @ApiMongoIdParam('id', 'Order id')
++  @ApiEnvelopeResponse({
++    description: 'The order',
++    message: 'The order found',
++    model: OrderResponseDto,
++  })
++  @ApiErrors(
++    [404, 'The order is not found'],
++    [401, 'Missing/invalid token, or the order does not belong to the user'],
++  )
++  @ApiPrivate('admin', 'user')
+   @Get(':id')
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -83,6 +168,22 @@ export class OrderController {
+   //* @Route  PATCH /api/v1/order/:id/status
+   //* @access Private['admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Update order status',
++    description:
++      'Updates the payment/delivery status of an order. **Access:** Admin only. Only `paymentStatus`, `isPaid` and `isDelivered` are applied; `paymentMethod` and `address` are accepted by validation but ignored. Note: the returned `data` is the order as it was BEFORE the update.',
++  })
++  @ApiMongoIdParam('id', 'Order id')
++  @ApiEnvelopeResponse({
++    description: 'Order updated (data is the document before the update)',
++    message: 'update the order successfully',
++    model: OrderResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed (paymentStatus must be pending|paid|failed, isPaid/isDelivered must be booleans)'],
++    [404, 'The order is not found'],
++  )
++  @ApiPrivate('admin')
+   @Patch(':id/status')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -105,6 +206,15 @@ export class OrderController {
+   //* @Route  DELETE /api/v1/order/:id
+   //* @access Private['user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Delete an order',
++    description:
++      'Permanently deletes one of the user\'s own orders (no status condition is checked; stock is not restored). **Access:** User only. Returns HTTP 200 with an empty body. An order owned by someone else is reported as not found.',
++  })
++  @ApiMongoIdParam('id', 'Order id')
++  @ApiResponse({ status: 200, description: 'Order deleted (empty body)' })
++  @ApiErrors([404, 'The order is not found or does not belong to the user'])
++  @ApiPrivate('user')
+   @Delete(':id')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+diff --git a/src/product/dto/create-product.dto.ts b/src/product/dto/create-product.dto.ts
+index 8371e5d..ef96e30 100644
+--- a/src/product/dto/create-product.dto.ts
++++ b/src/product/dto/create-product.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import {
+   IsArray,
+   IsDefined,
+@@ -15,6 +16,7 @@ import {
+ 
+ export class CreateProductDto {
+   //* Title:
++  @ApiProperty({ description: 'Unique product title', example: 'Apple iPhone 15 Pro 256GB', minLength: 3 })
+   @IsString({ message: 'The title must be string' })
+   @MinLength(3, { message: 'The Product title must be at least 3 characters' })
+   @IsDefined()
+@@ -22,6 +24,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* description:
++  @ApiProperty({ description: 'Product description', example: 'Titanium design, A17 Pro chip, 48MP main camera and USB-C.', minLength: 20 })
+   @IsString({ message: 'The description must be string' })
+   @MinLength(20, {
+     message: 'The Product description must be at least 20 characters',
+@@ -31,6 +34,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* quantity:
++  @ApiProperty({ description: 'Quantity in stock', example: 50, minimum: 1, maximum: 500, default: 1 })
+   @IsInt({ message: 'The quantity must be Integer number' })
+   @Min(1, { message: 'The Product quantity must be at least 1 product' })
+   @Max(500, { message: 'The Product quantity must be at most 500 product' })
+@@ -39,6 +43,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* imageCover:
++  @ApiProperty({ description: 'URL of the cover image', example: 'https://example.com/images/iphone-15-cover.jpg', format: 'uri' })
+   @IsString({ message: 'The imageCover must be string' })
+   @IsUrl({}, { message: 'The Image cover must be valid url' })
+   @IsDefined()
+@@ -46,6 +51,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* images:
++  @ApiPropertyOptional({ description: 'Additional image URLs (the schema marks images as required, so omitting it may fail with a database validation error)', type: [String], example: ['https://example.com/images/iphone-15-1.jpg', 'https://example.com/images/iphone-15-2.jpg'] })
+   @IsArray({ message: 'Images must be an array' })
+   @IsString({ each: true, message: 'Each image must be a string' })
+   @IsUrl({}, { each: true, message: 'Each image must be a valid URL' })
+@@ -54,12 +60,14 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* sold:
++  @ApiPropertyOptional({ description: 'Number of units already sold', example: 0, default: 0 })
+   @IsInt({ message: 'The sold must be Integer number' })
+   @IsOptional()
+   sold: number = 0;
+   //* ---------------------------------------------------------
+ 
+   //* price:
++  @ApiProperty({ description: 'Price in USD', example: 999.99, minimum: 1, maximum: 20000 })
+   @IsNumber({}, { message: 'The sold must be number' })
+   @Min(1, { message: 'The Product price must be at least 1$' })
+   @Max(20000, { message: 'The Product price must be at most 20000$' })
+@@ -68,6 +76,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* priceAfterDiscount:
++  @ApiPropertyOptional({ description: 'Price after discount in USD', example: 899.99, minimum: 1, maximum: 20000 })
+   @IsNumber({}, { message: 'The sold must be number' })
+   @Min(1, { message: 'The Product price discount must be at least 1$' })
+   @Max(20000, { message: 'The Product price discount must be at most 20000$' })
+@@ -76,6 +85,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* colors:
++  @ApiPropertyOptional({ description: 'Available colors', type: [String], example: ['black', 'silver'] })
+   @IsArray({ message: 'Images must be an array' })
+   @IsString({ each: true, message: 'Each image must be a string' })
+   @IsOptional()
+@@ -83,6 +93,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* category:
++  @ApiProperty({ description: 'Category ObjectId (must exist, otherwise 404)', example: '6a8b2469abf9629023788337' })
+   @IsString({ message: 'category must be a string' })
+   @IsMongoId({ message: 'The category must be valid id' })
+   @IsDefined()
+@@ -90,6 +101,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* subCategory:
++  @ApiPropertyOptional({ description: 'SubCategory ObjectId (must exist and belong to the given category, otherwise 404)', example: '6a8b2469abf9629023788338' })
+   @IsString({ message: 'subCategory must be a string' })
+   @IsMongoId({ message: 'The subCategory must be valid id' })
+   @IsOptional()
+@@ -97,6 +109,7 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* brand:
++  @ApiPropertyOptional({ description: 'Brand ObjectId (must exist, otherwise 404)', example: '6a8b2469abf9629023788339' })
+   @IsString({ message: 'brand must be a string' })
+   @IsMongoId({ message: 'The brand must be valid id' })
+   @IsOptional()
+@@ -104,12 +117,14 @@ export class CreateProductDto {
+   //* ---------------------------------------------------------
+ 
+   //* rateingAverage:
++  @ApiPropertyOptional({ description: 'Average rating (normally maintained by the review module)', example: 0, default: 0 })
+   @IsNumber({}, { message: 'rating average must be a number' })
+   @IsOptional()
+   rateingAverage: number = 0;
+   //* ---------------------------------------------------------
+ 
+   //* rateingCount:
++  @ApiPropertyOptional({ description: 'Number of ratings (normally maintained by the review module)', example: 0, default: 0 })
+   @IsInt({ message: 'rating average must be an Integer number' })
+   @IsOptional()
+   rateingCount: number = 0;
+diff --git a/src/product/dto/get-products.dto.ts b/src/product/dto/get-products.dto.ts
+index 45e9c95..f6bfe73 100644
+--- a/src/product/dto/get-products.dto.ts
++++ b/src/product/dto/get-products.dto.ts
+@@ -1,66 +1,81 @@
+ import { Transform, Type } from "class-transformer";
++import { ApiPropertyOptional } from "@nestjs/swagger";
+ import { IsBoolean, IsMongoId, IsNumber, IsOptional, IsString } from "class-validator";
+ 
+ export class GetProductsDto {
++  @ApiPropertyOptional({ description: 'Accepted by the DTO but currently ignored by the service', example: 'iphone' })
+   @IsOptional()
+   @IsString()
+   search?: string;
+ 
++  @ApiPropertyOptional({ description: 'Filter by title (case-insensitive partial match)', example: 'iphone' })
+   @IsOptional()
+   @IsString()
+   title?: string;
+ 
++  @ApiPropertyOptional({ description: 'Filter by category ObjectId', example: '6a8b2469abf9629023788337' })
+   @IsOptional()
+   @IsMongoId()
+   category?: string;
+ 
++  @ApiPropertyOptional({ description: 'Filter by subCategory ObjectId', example: '6a8b2469abf9629023788338' })
+   @IsOptional()
+   @IsMongoId()
+   subCategory?: string;
+ 
++  @ApiPropertyOptional({ description: 'Filter by brand ObjectId (exact match; any string passes validation)', example: '6a8b2469abf9629023788339' })
+   @IsOptional()
+   @IsString()
+   brand?: string;
+ 
++  @ApiPropertyOptional({ description: 'Minimum price (inclusive)', example: 100 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   minPrice?: number;
+ 
++  @ApiPropertyOptional({ description: 'Maximum price (inclusive)', example: 2000 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   maxPrice?: number;
+ 
++  @ApiPropertyOptional({ description: 'Accepted by the DTO but currently ignored by the service', example: 4 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   minRating?: number;
+ 
++  @ApiPropertyOptional({ description: 'Accepted by the DTO but currently ignored by the service. Send "true" or "false"', type: Boolean, example: true })
+   @IsOptional()
+   @IsBoolean()
+   @Transform(({ value }) => value === 'true')
+   inStock?: boolean;
+ 
++  @ApiPropertyOptional({ description: 'Accepted by the DTO but currently ignored by the service. Send "true" or "false"', type: Boolean, example: true })
+   @IsOptional()
+   @IsBoolean()
+   @Transform(({ value }) => value === 'true')
+   isActive?: boolean;
+ 
++  @ApiPropertyOptional({ description: 'Page size (service default 10)', type: Number, default: 10, example: 10 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   limit?: number;
+ 
++  @ApiPropertyOptional({ description: 'Number of documents to skip (service default 0)', type: Number, default: 0, example: 0 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   skip?: number;
+ 
++  @ApiPropertyOptional({ description: 'Product field to sort by (any string is accepted and used as the Mongo sort key, e.g. createdAt, price, title, rateingAverage, sold)', default: 'createdAt', example: 'price' })
+   @IsOptional()
+   @IsString()
+   sort?: string;
+ 
++  @ApiPropertyOptional({ description: 'Sort direction; any value other than "asc" sorts descending', enum: ['asc', 'desc'], default: 'asc' })
+   @IsOptional()
+   @IsString()
+   order?: 'asc' | 'desc';
+diff --git a/src/product/dto/product-response.dto.ts b/src/product/dto/product-response.dto.ts
+new file mode 100644
+index 0000000..f1d872f
+--- /dev/null
++++ b/src/product/dto/product-response.dto.ts
+@@ -0,0 +1,61 @@
++import { ApiExtraModels, ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
++import { BaseDocumentDto, EXAMPLE_OBJECT_ID } from 'src/common/swagger/swagger.helpers';
++
++/** Populated reference containing only the name */
++export class RefNameDto {
++  @ApiProperty({ example: EXAMPLE_OBJECT_ID })
++  _id!: string;
++
++  @ApiProperty({ example: 'Smartphones' })
++  name!: string;
++}
++
++const refOrId = (description: string) => ({
++  description,
++  oneOf: [{ type: 'string', example: EXAMPLE_OBJECT_ID }, { $ref: getSchemaPath(RefNameDto) }],
++});
++
++@ApiExtraModels(RefNameDto)
++export class ProductResponseDto extends BaseDocumentDto {
++  @ApiProperty({ example: 'Apple iPhone 15 Pro 256GB' })
++  title!: string;
++
++  @ApiProperty({ example: 'Titanium design, A17 Pro chip, 48MP main camera and USB-C.' })
++  description!: string;
++
++  @ApiProperty({ example: 50, description: 'Quantity in stock' })
++  quantity!: number;
++
++  @ApiProperty({ example: 'https://example.com/images/iphone-15-cover.jpg' })
++  imageCover!: string;
++
++  @ApiProperty({ type: [String], example: ['https://example.com/images/iphone-15-1.jpg'] })
++  images!: string[];
++
++  @ApiProperty({ example: 0, description: 'Units sold' })
++  sold!: number;
++
++  @ApiProperty({ example: 999.99 })
++  price!: number;
++
++  @ApiPropertyOptional({ example: 899.99 })
++  priceAfterDiscount?: number;
++
++  @ApiPropertyOptional({ type: [String], example: ['black', 'silver'] })
++  colors?: string[];
++
++  @ApiProperty(refOrId('Category: an ObjectId string on create, or `{ _id, name }` when populated (list, get, update)'))
++  category!: string | RefNameDto;
++
++  @ApiPropertyOptional(refOrId('SubCategory: an ObjectId string on create, or `{ _id, name }` when populated (list, get, update)'))
++  subCategory?: string | RefNameDto;
++
++  @ApiPropertyOptional(refOrId('Brand: an ObjectId string on create, or `{ _id, name }` when populated (list, get, update)'))
++  brand?: string | RefNameDto;
++
++  @ApiProperty({ example: 0, description: 'Average rating' })
++  rateingAverage!: number;
++
++  @ApiProperty({ example: 0, description: 'Number of ratings' })
++  rateingCount!: number;
++}
+diff --git a/src/product/dto/update-product.dto.ts b/src/product/dto/update-product.dto.ts
+index e2d43fc..87b9d7f 100644
+--- a/src/product/dto/update-product.dto.ts
++++ b/src/product/dto/update-product.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateProductDto } from './create-product.dto';
+ 
+ export class UpdateProductDto extends PartialType(CreateProductDto) {}
+diff --git a/src/product/product.controller.ts b/src/product/product.controller.ts
+index 4be38bd..e60ba29 100644
+--- a/src/product/product.controller.ts
++++ b/src/product/product.controller.ts
+@@ -18,7 +18,17 @@ import { Role } from 'src/user/enums/roles.enum';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
+ import { GetProductsDto } from './dto/get-products.dto';
++import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
++import { ProductResponseDto } from './dto/product-response.dto';
++import { ReviewResponseDto } from 'src/review/dto/review-response.dto';
+ 
++@ApiTags('Product')
+ @Controller('product')
+ export class ProductController {
+   constructor(private readonly productService: ProductService) {}
+@@ -28,6 +38,24 @@ export class ProductController {
+   //* @Route  POST /api/v1/product
+   //* @access Private['admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Create a product',
++    description:
++      'Creates a product. **Access:** Admin. The title must be unique (400 otherwise), the category must exist (404), and the optional subCategory (must belong to the category) and brand must exist (404). The response body contains the misspelled key `stauts` (instead of `status`); category/subCategory/brand are returned as ids (not populated).',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    status: 201,
++    noStatus: true,
++    description: 'Product created',
++    message: 'The product is created successfully',
++    model: ProductResponseDto,
++    extra: { stauts: { type: 'number', example: 201 } },
++  })
++  @ApiErrors(
++    [400, 'Validation failed, or a product with the same title already exists'],
++    [404, 'Category not found, subCategory not found / not in the category, or brand not found'],
++  )
+   @Post()
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -48,6 +76,20 @@ export class ProductController {
+   //* @Route  GET /api/v1/product/id/reviews
+   //* @access Public
+   //?=======================================
++  @ApiTags('Product', 'Review')
++  @ApiOperation({
++    summary: 'List reviews of a product',
++    description:
++      'Returns the reviews written for a product. **Access:** Public. The query reuses GetProductsDto but only `limit` (default 10) and `skip` (default 0) are used; no sorting is applied and the reviewer is not populated.',
++  })
++  @ApiMongoIdParam('id', 'Product ObjectId')
++  @ApiEnvelopeResponse({
++    description: 'Reviews fetched',
++    message: 'reviews fetched successfully',
++    bodyStatus: 200,
++    list: { key: 'reviews', model: ReviewResponseDto },
++  })
++  @ApiErrors([400, 'Invalid ObjectId or invalid query parameters'], [404, 'Product not found'])
+   @Get(':id/reviews')
+   findReviewsForProducut(
+     @Query(
+@@ -67,6 +109,18 @@ export class ProductController {
+   //* @Route  GET /api/v1/product
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'List products',
++    description:
++      'Returns a paginated list of products. **Access:** Public. Applied filters: title (case-insensitive regex), category, subCategory, brand, minPrice/maxPrice (inclusive). Defaults: limit 10, skip 0, sort createdAt ascending. `sort` accepts any product field and `order` any value other than `asc` sorts descending. `search`, `minRating`, `inStock` and `isActive` are accepted but currently ignored. category, subCategory and brand are populated with only their `name`.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Products fetched',
++    message: 'products fetched successfully',
++    bodyStatus: 200,
++    list: { key: 'products', model: ProductResponseDto },
++  })
++  @ApiErrors([400, 'Invalid query parameters (e.g. malformed category ObjectId)'])
+   @Get()
+   findAll(
+     @Query(
+@@ -85,6 +139,20 @@ export class ProductController {
+   //* @Route  GET /api/v1/product/:id
+   //* @access Public
+   //?=======================================
++  @ApiOperation({
++    summary: 'Get a product by id',
++    description:
++      'Returns a single product with category, subCategory and brand populated (name only). **Access:** Public. The response body contains the misspelled key `stauts` (instead of `status`).',
++  })
++  @ApiMongoIdParam('id', 'Product ObjectId')
++  @ApiEnvelopeResponse({
++    noStatus: true,
++    description: 'Product found',
++    message: 'The product founded successfully',
++    model: ProductResponseDto,
++    extra: { stauts: { type: 'number', example: 200 } },
++  })
++  @ApiErrors([400, 'Invalid ObjectId'], [404, 'Product not found'])
+   @Get(':id')
+   findOne(@Param('id') id: string) {
+     return this.productService.findOne(id);
+@@ -95,6 +163,24 @@ export class ProductController {
+   //* @Route  PATCH /api/v1/product/:id
+   //* @access Private['admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Update a product',
++    description:
++      'Partially updates a product (all body fields optional). **Access:** Admin. A new title must be unique; changing the category requires sending a subCategory as well (400); category, subCategory (must belong to the category) and brand must exist (404). The response body contains the misspelled key `stauts` (instead of `status`).',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'Product ObjectId')
++  @ApiEnvelopeResponse({
++    noStatus: true,
++    description: 'Product updated',
++    message: 'Product updated',
++    model: ProductResponseDto,
++    extra: { stauts: { type: 'number', example: 200 } },
++  })
++  @ApiErrors(
++    [400, 'Validation failed, invalid ObjectId, duplicate title, or category changed without a subCategory'],
++    [404, 'Product, category, subCategory (or not in the category) or brand not found'],
++  )
+   @Patch(':id')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -116,6 +202,15 @@ export class ProductController {
+   //* @Route  DELETE /api/v1/product/:id
+   //* @access Private['admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Delete a product',
++    description:
++      'Deletes a product and, in the same transaction, all reviews written for it. **Access:** Admin. Returns HTTP 200 with an empty body.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'Product ObjectId')
++  @ApiResponse({ status: 200, description: 'Product and its reviews deleted (empty body)' })
++  @ApiErrors([400, 'Invalid ObjectId'], [404, 'Product not found'])
+   @Delete(':id')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+diff --git a/src/req-product/dto/create-req-product.dto.ts b/src/req-product/dto/create-req-product.dto.ts
+index 3c26226..051358a 100644
+--- a/src/req-product/dto/create-req-product.dto.ts
++++ b/src/req-product/dto/create-req-product.dto.ts
+@@ -1,7 +1,9 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import { IsDefined, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+ 
+ export class CreateReqProductDto {
+   //* titleName:
++  @ApiProperty({ description: 'Name of the requested product (a user cannot request the same name twice)', example: 'Sony WH-1000XM5 headphones', minLength: 5 })
+   @IsString({ message: 'The title name must be string' })
+   @MinLength(5, { message: 'The title name must at least 5 characters' })
+   @IsDefined()
+@@ -9,6 +11,7 @@ export class CreateReqProductDto {
+   //* -------------------------------------------------------
+ 
+   //* details:
++  @ApiProperty({ description: 'Details about the requested product', example: 'Black color, with the original carrying case.', minLength: 5 })
+   @IsString({ message: 'The details must be string' })
+   @MinLength(5, { message: 'The details must at least 5 characters' })
+   @IsDefined()
+@@ -16,6 +19,7 @@ export class CreateReqProductDto {
+   //* -------------------------------------------------------
+ 
+   //* quantity:
++  @ApiProperty({ description: 'Requested quantity (integer)', example: 2, minimum: 1 })
+   @IsInt({ message: 'The quantity must be Integer Number' })
+   @Min(1, { message: 'The quantity must at least 1 product' })
+   @IsDefined()
+@@ -23,6 +27,7 @@ export class CreateReqProductDto {
+   //* -------------------------------------------------------
+ 
+   //* category:
++  @ApiPropertyOptional({ description: 'Free-text category (not an ObjectId)', example: 'Electronics' })
+   @IsString({ message: 'The category must be string' })
+   @IsOptional()
+   category!: string;
+diff --git a/src/req-product/dto/get-reqProducts.dto.ts b/src/req-product/dto/get-reqProducts.dto.ts
+index c012413..1258a27 100644
+--- a/src/req-product/dto/get-reqProducts.dto.ts
++++ b/src/req-product/dto/get-reqProducts.dto.ts
+@@ -1,13 +1,16 @@
+ import { Type } from 'class-transformer';
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { IsInt, IsOptional, Min } from 'class-validator';
+ 
+ export class GetReqProductsDto {
++  @ApiPropertyOptional({ description: 'Page size', default: 10, minimum: 1, example: 10 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+   limit?: number = 10;
+ 
++  @ApiPropertyOptional({ description: 'Number of documents to skip', default: 0, minimum: 0, example: 0 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+diff --git a/src/req-product/dto/req-product-response.dto.ts b/src/req-product/dto/req-product-response.dto.ts
+new file mode 100644
+index 0000000..e2d40f3
+--- /dev/null
++++ b/src/req-product/dto/req-product-response.dto.ts
+@@ -0,0 +1,36 @@
++import { ApiExtraModels, ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
++import { BaseDocumentDto, EXAMPLE_OBJECT_ID } from 'src/common/swagger/swagger.helpers';
++
++/** Populated requester (name and email are selected) */
++export class ReqProductUserDto {
++  @ApiProperty({ example: EXAMPLE_OBJECT_ID })
++  _id!: string;
++
++  @ApiProperty({ example: 'John Doe' })
++  name!: string;
++
++  @ApiProperty({ example: 'john@example.com' })
++  email!: string;
++}
++
++@ApiExtraModels(ReqProductUserDto)
++export class ReqProductResponseDto extends BaseDocumentDto {
++  @ApiProperty({ example: 'Sony WH-1000XM5 headphones' })
++  titleName!: string;
++
++  @ApiProperty({ example: 'Black color, with the original carrying case.' })
++  details!: string;
++
++  @ApiProperty({ example: 2, minimum: 1 })
++  quantity!: number;
++
++  @ApiPropertyOptional({ example: 'Electronics' })
++  category?: string;
++
++  @ApiProperty({
++    description:
++      'Requesting user: `{ _id, name, email }` when populated (create, get, update, and the admin list), otherwise an ObjectId string (the list for a regular user)',
++    oneOf: [{ type: 'string', example: EXAMPLE_OBJECT_ID }, { $ref: getSchemaPath(ReqProductUserDto) }],
++  })
++  user!: string | ReqProductUserDto;
++}
+diff --git a/src/req-product/dto/update-req-product.dto.ts b/src/req-product/dto/update-req-product.dto.ts
+index 370ac93..9727e1e 100644
+--- a/src/req-product/dto/update-req-product.dto.ts
++++ b/src/req-product/dto/update-req-product.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateReqProductDto } from './create-req-product.dto';
+ 
+ export class UpdateReqProductDto extends PartialType(CreateReqProductDto) {}
+diff --git a/src/req-product/req-product.controller.ts b/src/req-product/req-product.controller.ts
+index d359409..111b3b3 100644
+--- a/src/req-product/req-product.controller.ts
++++ b/src/req-product/req-product.controller.ts
+@@ -19,7 +19,16 @@ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
+ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+ import { GetReqProductsDto } from './dto/get-reqProducts.dto';
++import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
++import { ReqProductResponseDto } from './dto/req-product-response.dto';
+ 
++@ApiTags('Request product')
+ @Controller('req-product')
+ export class ReqProductController {
+   constructor(private readonly reqProductService: ReqProductService) {}
+@@ -29,6 +38,20 @@ export class ReqProductController {
+   //* @Route  POST /api/v1/req-product
+   //* @access Private['user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Create a product request',
++    description:
++      'A user asks the store to stock an item. **Access:** User. A user cannot create two requests with the same titleName (400). The requester is returned populated (name, email).',
++  })
++  @ApiPrivate('user')
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 201,
++    description: 'Request created',
++    message: 'The Request product created successfully',
++    model: ReqProductResponseDto,
++  })
++  @ApiErrors([400, 'Validation failed, or the user already requested a product with this titleName'])
+   @Post()
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -50,6 +73,18 @@ export class ReqProductController {
+   //* @Route  GET /api/v1/req-product
+   //* @access Private['amdin','user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'List product requests',
++    description:
++      'Returns a paginated list of product requests. **Access:** User & Admin. Admins see all requests (with the requester populated: name, email); users see only their own. Defaults: limit 10, skip 0. Query values are not validated by a ValidationPipe on this route.',
++  })
++  @ApiPrivate('admin', 'user')
++  @ApiEnvelopeResponse({
++    description: 'Requests fetched',
++    message: 'The reqProducts fetchs successfully',
++    bodyStatus: 200,
++    list: { key: 'reqProducts', model: ReqProductResponseDto },
++  })
+   @Get()
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -62,6 +97,23 @@ export class ReqProductController {
+   //* @Route  GET /api/v1/req-product/:id
+   //* @access Private['amdin','user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Get a product request by id',
++    description:
++      'Returns a single product request with the requester populated (name, email). **Access:** User & Admin. Admins can read any request; users only their own (401 otherwise).',
++  })
++  @ApiPrivate('admin', 'user')
++  @ApiMongoIdParam('id', 'Request ObjectId')
++  @ApiEnvelopeResponse({
++    description: 'Request found',
++    message: 'The Request Product founded successfully',
++    model: ReqProductResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Invalid ObjectId'],
++    [401, 'Missing/invalid token, or the request does not belong to the user'],
++    [404, 'Request not found'],
++  )
+   @Get(':id')
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -74,6 +126,23 @@ export class ReqProductController {
+   //* @Route  PATCH /api/v1/req-product/:id
+   //* @access Private['user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Update own product request',
++    description:
++      'Partially updates a product request (all body fields optional). **Access:** User (owner only). The new titleName must not be used by another request (400).',
++  })
++  @ApiPrivate('user')
++  @ApiMongoIdParam('id', 'Request ObjectId')
++  @ApiEnvelopeResponse({
++    description: 'Request updated',
++    message: 'The Request Product updated successfully',
++    model: ReqProductResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed, invalid ObjectId, or another request already uses this titleName'],
++    [401, 'Missing/invalid token, role not allowed, or the request does not belong to the user'],
++    [404, 'Request not found'],
++  )
+   @Patch(':id')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -96,6 +165,18 @@ export class ReqProductController {
+   //* @Route  DELETE /api/v1/req-product/:id
+   //* @access Private['user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Delete own product request',
++    description: 'Deletes a product request. **Access:** User (owner only). Returns HTTP 200 with an empty body.',
++  })
++  @ApiPrivate('user')
++  @ApiMongoIdParam('id', 'Request ObjectId')
++  @ApiResponse({ status: 200, description: 'Request deleted (empty body)' })
++  @ApiErrors(
++    [400, 'Invalid ObjectId'],
++    [401, 'Missing/invalid token, role not allowed, or the request does not belong to the user'],
++    [404, 'Request not found'],
++  )
+   @Delete(':id')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+diff --git a/src/review/dto/create-review.dto.ts b/src/review/dto/create-review.dto.ts
+index f563bb5..26fa789 100644
+--- a/src/review/dto/create-review.dto.ts
++++ b/src/review/dto/create-review.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import {
+   IsDefined,
+   IsInt,
+@@ -11,6 +12,7 @@ import {
+ 
+ export class CreateReviewDto {
+   //* reviewText:
++  @ApiPropertyOptional({ description: 'Review text', example: 'Great phone, battery lasts all day.', minLength: 3 })
+   @IsString({ message: 'The Review must be string' })
+   @MinLength(3, { message: 'The Review must be aleast 3 characters' })
+   @IsOptional()
+@@ -18,6 +20,7 @@ export class CreateReviewDto {
+   //* ===================================
+ 
+   //* rating:
++  @ApiProperty({ description: 'Rating in stars (integer)', example: 5, minimum: 0, maximum: 5 })
+   @IsInt({ message: 'The Review must be Integer number' })
+   @Min(0, { message: 'The Min rating is 0 stars' })
+   @Max(5, { message: 'The Max rating is 5 stars' })
+@@ -26,6 +29,7 @@ export class CreateReviewDto {
+   //* ===================================
+ 
+   //* product:
++  @ApiProperty({ description: 'ObjectId of the product being reviewed', example: '6a8b2469abf9629023788337' })
+   @IsMongoId({ message: 'The product must be valid id' })
+   @IsDefined()
+   product!: string;
+diff --git a/src/review/dto/get-review.dto.ts b/src/review/dto/get-review.dto.ts
+index d44944d..39a0166 100644
+--- a/src/review/dto/get-review.dto.ts
++++ b/src/review/dto/get-review.dto.ts
+@@ -1,12 +1,15 @@
+ import { Type } from 'class-transformer';
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { IsNumber, IsOptional } from 'class-validator';
+ 
+ export class GetReviewDto {
++  @ApiPropertyOptional({ description: 'Page size (service default 10)', type: Number, default: 10, example: 10 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+   limit?: number;
+ 
++  @ApiPropertyOptional({ description: 'Number of documents to skip (service default 0)', type: Number, default: 0, example: 0 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsNumber()
+diff --git a/src/review/dto/review-response.dto.ts b/src/review/dto/review-response.dto.ts
+new file mode 100644
+index 0000000..b3b6277
+--- /dev/null
++++ b/src/review/dto/review-response.dto.ts
+@@ -0,0 +1,30 @@
++import { ApiExtraModels, ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
++import { BaseDocumentDto, EXAMPLE_OBJECT_ID } from 'src/common/swagger/swagger.helpers';
++
++/** Populated reviewer (only the name is selected) */
++export class ReviewUserDto {
++  @ApiProperty({ example: EXAMPLE_OBJECT_ID })
++  _id!: string;
++
++  @ApiProperty({ example: 'John Doe' })
++  name!: string;
++}
++
++@ApiExtraModels(ReviewUserDto)
++export class ReviewResponseDto extends BaseDocumentDto {
++  @ApiPropertyOptional({ example: 'Great phone, battery lasts all day.', minLength: 3 })
++  reviewText?: string;
++
++  @ApiProperty({ example: 5, minimum: 0, maximum: 5 })
++  rating!: number;
++
++  @ApiProperty({
++    description:
++      'Reviewer: an ObjectId string, or `{ _id, name }` when populated (the review list populates it)',
++    oneOf: [{ type: 'string', example: EXAMPLE_OBJECT_ID }, { $ref: getSchemaPath(ReviewUserDto) }],
++  })
++  user!: string | ReviewUserDto;
++
++  @ApiProperty({ example: EXAMPLE_OBJECT_ID, description: 'Reviewed product ObjectId' })
++  product!: string;
++}
+diff --git a/src/review/dto/update-review.dto.ts b/src/review/dto/update-review.dto.ts
+index e0135e5..4942b95 100644
+--- a/src/review/dto/update-review.dto.ts
++++ b/src/review/dto/update-review.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateReviewDto } from './create-review.dto';
+ 
+ export class UpdateReviewDto extends PartialType(CreateReviewDto) {}
+diff --git a/src/review/review.controller.ts b/src/review/review.controller.ts
+index 30756a7..872670f 100644
+--- a/src/review/review.controller.ts
++++ b/src/review/review.controller.ts
+@@ -19,7 +19,17 @@ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
+ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+ import { GetReviewDto } from './dto/get-review.dto';
++import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++  PaginationDto,
++} from 'src/common/swagger/swagger.helpers';
++import { ReviewResponseDto } from './dto/review-response.dto';
+ 
++@ApiTags('Review')
+ @Controller('review')
+ export class ReviewController {
+   constructor(private readonly reviewService: ReviewService) {}
+@@ -29,6 +39,23 @@ export class ReviewController {
+   //* @Route  POST /api/v1/review
+   //* @access Private['user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Create a review',
++    description:
++      'Adds a review for a product on behalf of the authenticated user. **Access:** User. A user can review a given product only once (400 otherwise); the product must exist (404).',
++  })
++  @ApiPrivate('user')
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 201,
++    description: 'Review created',
++    message: 'The review is created successfuly',
++    model: ReviewResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed, or the user already reviewed this product'],
++    [404, 'Product not found'],
++  )
+   @Post()
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -50,6 +77,20 @@ export class ReviewController {
+   //* @Route  GET /api/v1/review
+   //* @access Private['admin','user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'List reviews',
++    description:
++      'Returns reviews with the reviewer populated (name only). **Access:** User & Admin. Admins see all reviews; users see only their own. Defaults: limit 10, skip 0. Unlike most list endpoints, `data` is the array of reviews and `pagination` sits next to it at the top level; for users `pagination.total` counts all reviews in the system, not only their own.',
++  })
++  @ApiPrivate('admin', 'user')
++  @ApiEnvelopeResponse({
++    description: 'Reviews fetched (admin: "get all reviews", user: "get all reviews owned by the user")',
++    message: 'get all reviews',
++    bodyStatus: 200,
++    data: { type: 'array', items: { $ref: getSchemaPath(ReviewResponseDto) } },
++    extra: { pagination: { $ref: getSchemaPath(PaginationDto) } },
++  })
++  @ApiExtraModels(ReviewResponseDto, PaginationDto)
+   @Get()
+   @Roles(Role.User, Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -62,6 +103,23 @@ export class ReviewController {
+   //* @Route  GET /api/v1/review/:Id
+   //* @access Private['admin','user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Get a review by id',
++    description:
++      'Returns a single review (the reviewer is not populated). **Access:** User & Admin. Admins can read any review; a user can read only their own (401 otherwise).',
++  })
++  @ApiPrivate('admin', 'user')
++  @ApiMongoIdParam('id', 'Review ObjectId')
++  @ApiEnvelopeResponse({
++    description: 'Review found',
++    message: 'The review founded',
++    model: ReviewResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Invalid ObjectId'],
++    [401, 'Missing/invalid token, or the review does not belong to the user'],
++    [404, 'Review not found'],
++  )
+   @Get(':id')
+   @Roles(Role.User, Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -74,6 +132,23 @@ export class ReviewController {
+   //* @Route  PATCH /api/v1/review/:Id
+   //* @access Private['user']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Update own review',
++    description:
++      'Partially updates a review (all body fields optional). **Access:** User (owner only). Updating the rating also recalculates the product rating.',
++  })
++  @ApiPrivate('user')
++  @ApiMongoIdParam('id', 'Review ObjectId')
++  @ApiEnvelopeResponse({
++    description: 'Review updated',
++    message: 'The review updated successfully',
++    model: ReviewResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Validation failed or invalid ObjectId'],
++    [401, 'Missing/invalid token, role not allowed, or the user does not own the review'],
++    [404, 'Review or its product not found'],
++  )
+   @Patch(':id')
+   @Roles(Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -93,6 +168,19 @@ export class ReviewController {
+   //* @Route  DELETE /api/v1/review/:Id
+   //* @access Private['user','admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Delete a review',
++    description:
++      'Deletes a review and recalculates the product rating. **Access:** User & Admin. The route allows both roles, but the service only lets the review owner delete it (403 for anyone else, including admins). Returns HTTP 200 with an empty body.',
++  })
++  @ApiPrivate('admin', 'user')
++  @ApiMongoIdParam('id', 'Review ObjectId')
++  @ApiResponse({ status: 200, description: 'Review deleted (empty body)' })
++  @ApiErrors(
++    [400, 'Invalid ObjectId'],
++    [403, 'The authenticated user is not the owner of the review'],
++    [404, 'Review not found'],
++  )
+   @Delete(':id')
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+diff --git a/src/stripe/stripe.controller.ts b/src/stripe/stripe.controller.ts
+index c60b41c..dbda570 100644
+--- a/src/stripe/stripe.controller.ts
++++ b/src/stripe/stripe.controller.ts
+@@ -8,6 +8,14 @@ import {
+   Req,
+ } from '@nestjs/common';
+ import type { RawBodyRequest } from '@nestjs/common';
++import {
++  ApiBody,
++  ApiHeader,
++  ApiOperation,
++  ApiResponse,
++  ApiTags,
++} from '@nestjs/swagger';
++import { ApiErrors } from 'src/common/swagger/swagger.helpers';
+ import type { Request } from 'express';
+ import { ConfigService } from '@nestjs/config';
+ import Stripe from 'stripe';
+@@ -18,6 +26,7 @@ import { Order } from 'src/order/order.schema';
+ import { Product } from 'src/product/product.schema';
+ import { Cart } from 'src/cart/cart.schema';
+ 
++@ApiTags('Stripe')
+ @Controller('stripe')
+ export class StripeController {
+   constructor(
+@@ -32,6 +41,36 @@ export class StripeController {
+     private readonly connection: Connection,
+   ) {}
+ 
++  @ApiOperation({
++    summary: 'Stripe webhook',
++    description:
++      '⚠️ Called by Stripe only – it cannot be tried out from Swagger because the request must carry a valid `stripe-signature` computed over the raw body. **Access:** Public (authenticated by the Stripe signature).\n\n' +
++      'Handles the `checkout.session.completed` event: verifies the signature, checks the order/session pair, amount and currency (EGP), then in a single MongoDB transaction deducts stock (`quantity` -, `sold` +), marks the order as paid (`isPaid`, `paymentStatus: paid`, `paidAt`) and deletes the user cart. Duplicate deliveries are idempotent (stock is not deducted twice). Other event types are acknowledged with `{ received: true }`.',
++  })
++  @ApiHeader({
++    name: 'stripe-signature',
++    required: true,
++    description: 'Signature generated by Stripe for the raw request body',
++  })
++  @ApiBody({
++    description: 'Raw Stripe event payload',
++    schema: {
++      type: 'object',
++      example: {
++        id: 'evt_1Nxxxxxxxxxxxx',
++        type: 'checkout.session.completed',
++        data: { object: { id: 'cs_test_a1b2c3', payment_status: 'paid', metadata: { orderId: '6a8b2469abf9629023788337' } } },
++      },
++    },
++  })
++  @ApiResponse({
++    status: 200,
++    description: 'Event received',
++    schema: { type: 'object', properties: { received: { type: 'boolean', example: true } } },
++  })
++  @ApiErrors(
++    [400, 'Bad Request – missing webhook secret/signature, invalid signature, missing orderId, order not found, amount/currency mismatch, or insufficient stock'],
++  )
+   @Post('webhook')
+   @HttpCode(HttpStatus.OK)
+   async handleWebhook(
+diff --git a/src/sub-category/dto/create-sub-category.dto.ts b/src/sub-category/dto/create-sub-category.dto.ts
+index 8cea5d9..3fd8c4e 100644
+--- a/src/sub-category/dto/create-sub-category.dto.ts
++++ b/src/sub-category/dto/create-sub-category.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty } from '@nestjs/swagger';
+ import {
+   IsDefined,
+   IsString,
+@@ -7,6 +8,12 @@ import {
+ 
+ export class CreateSubCategoryDto {
+   //* Name
++  @ApiProperty({
++    description: 'Sub-category name (must be unique)',
++    example: 'iPhones',
++    minLength: 3,
++    maxLength: 30,
++  })
+   @IsString({ message: 'The Category name must be string' })
+   @MinLength(3, { message: 'The Min Length for category name is 3 characters' })
+   @MaxLength(30, {
+@@ -16,6 +23,10 @@ export class CreateSubCategoryDto {
+   //* ----------------------------------------------------
+ 
+   //* category
++  @ApiProperty({
++    description: 'ObjectId of the parent category (must exist)',
++    example: '6a8b2469abf9629023788337',
++  })
+   @IsString({ message: 'The category must be string' })
+   @IsDefined()
+   category!: string;
+diff --git a/src/sub-category/dto/sub-category-response.dto.ts b/src/sub-category/dto/sub-category-response.dto.ts
+new file mode 100644
+index 0000000..5da213b
+--- /dev/null
++++ b/src/sub-category/dto/sub-category-response.dto.ts
+@@ -0,0 +1,30 @@
++import { ApiProperty } from '@nestjs/swagger';
++import {
++  BaseDocumentDto,
++  EXAMPLE_OBJECT_ID,
++} from 'src/common/swagger/swagger.helpers';
++import { CategoryResponseDto } from 'src/category/dto/category-response.dto';
++
++/** Sub-category as returned by the category sub-categories endpoint (category is an ObjectId, not populated) */
++export class SubCategoryRefResponseDto extends BaseDocumentDto {
++  @ApiProperty({ description: 'Sub-category name', example: 'iPhones' })
++  name!: string;
++
++  @ApiProperty({
++    description: 'ObjectId of the parent category',
++    example: EXAMPLE_OBJECT_ID,
++  })
++  category!: string;
++}
++
++/** Sub-category with its parent category populated (create, list, get, update endpoints) */
++export class SubCategoryResponseDto extends BaseDocumentDto {
++  @ApiProperty({ description: 'Sub-category name', example: 'iPhones' })
++  name!: string;
++
++  @ApiProperty({
++    description: 'Parent category (populated)',
++    type: () => CategoryResponseDto,
++  })
++  category!: CategoryResponseDto;
++}
+diff --git a/src/sub-category/dto/update-sub-category.dto.ts b/src/sub-category/dto/update-sub-category.dto.ts
+index 205feaa..0a856f8 100644
+--- a/src/sub-category/dto/update-sub-category.dto.ts
++++ b/src/sub-category/dto/update-sub-category.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateSubCategoryDto } from './create-sub-category.dto';
+ 
+ export class UpdateSubCategoryDto extends PartialType(CreateSubCategoryDto) {}
+diff --git a/src/sub-category/sub-category.controller.ts b/src/sub-category/sub-category.controller.ts
+index ffaeab7..d0f86aa 100644
+--- a/src/sub-category/sub-category.controller.ts
++++ b/src/sub-category/sub-category.controller.ts
+@@ -16,7 +16,16 @@ import { Role } from 'src/user/enums/roles.enum';
+ import { Roles } from 'src/user/decorator/roles.decorator';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
++import { SubCategoryResponseDto } from './dto/sub-category-response.dto';
++import { ApiExtraModels, ApiOperation, ApiTags, getSchemaPath } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
+ 
++@ApiTags('Sub-category')
+ @Controller('sub-category')
+ export class SubCategoryController {
+   constructor(private readonly subCategoryService: SubCategoryService) {}
+@@ -27,6 +36,19 @@ export class SubCategoryController {
+   //* @access Private['admin']
+   //?=======================================
+   @Post()
++  @ApiOperation({
++    summary: 'Create a sub-category',
++    description:
++      'Creates a sub-category under an existing category. **Access:** Admin (Bearer token required). The name must be unique across all sub-categories (400 otherwise); the `category` ObjectId must be valid (400) and must exist (404). The parent category is returned populated.',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    status: 201,
++    description: 'Sub-category created',
++    message: 'the subCategory is created successfully :)',
++    model: SubCategoryResponseDto,
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   create(@Body(new ValidationPipe({
+@@ -42,6 +64,19 @@ export class SubCategoryController {
+   //* @access Public
+   //?=======================================
+   @Get()
++  @ApiOperation({
++    summary: 'List all sub-categories',
++    description:
++      'Returns all sub-categories with their parent category populated. The response also contains a top-level `length`. **Access:** Public.',
++  })
++  @ApiExtraModels(SubCategoryResponseDto)
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'List of sub-categories',
++    message: 'All Sub Categories founded successfully',
++    data: { type: 'array', items: { $ref: getSchemaPath(SubCategoryResponseDto) } },
++    extra: { length: { type: 'number', example: 5, description: 'Number of sub-categories returned' } },
++  })
+   findAll() {
+     return this.subCategoryService.findAll();
+   }
+@@ -52,6 +87,19 @@ export class SubCategoryController {
+   //* @access Public
+   //?=======================================
+   @Get(':id')
++  @ApiOperation({
++    summary: 'Get a sub-category by id',
++    description:
++      'Returns a single sub-category with its parent category populated. **Access:** Public.',
++  })
++  @ApiMongoIdParam('id', 'ObjectId of the sub-category')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The sub-category',
++    message: 'The subCategory is founded successfully :)',
++    model: SubCategoryResponseDto,
++  })
++  @ApiErrors(400, 404)
+   findOne(@Param('id') id: string) {
+     return this.subCategoryService.findOne(id);
+   }
+@@ -63,6 +111,20 @@ export class SubCategoryController {
+   //* @access Private['Admin']
+   //?=======================================
+   @Patch(':id')
++  @ApiOperation({
++    summary: 'Update a sub-category',
++    description:
++      'Partially updates a sub-category (all body fields are optional). **Access:** Admin (Bearer token required). A changed name must stay unique (400); a changed `category` must be a valid ObjectId (400) of an existing category (404).',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the sub-category')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The updated sub-category',
++    message: 'The subCategory is updated successfuly :)',
++    model: SubCategoryResponseDto,
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard,RolesGuard)
+   update(
+@@ -81,6 +143,19 @@ export class SubCategoryController {
+   //* @access Private['Admin']
+   //?=======================================
+   @Delete(':id')
++  @ApiOperation({
++    summary: 'Delete a sub-category',
++    description:
++      'Deletes a sub-category. **Access:** Admin (Bearer token required). The response contains no data.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the sub-category')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'Sub-category deleted',
++    message: 'Subcategory is deleted Successfully :)',
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard,RolesGuard)
+   remove(@Param('id') id: string) {
+diff --git a/src/supplier/dto/create-supplier.dto.ts b/src/supplier/dto/create-supplier.dto.ts
+index 41591ee..6414af2 100644
+--- a/src/supplier/dto/create-supplier.dto.ts
++++ b/src/supplier/dto/create-supplier.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty } from '@nestjs/swagger';
+ import {
+   IsDefined,
+   IsString,
+@@ -8,6 +9,12 @@ import {
+ 
+ export class CreateSupplierDto {
+   //* Name:
++  @ApiProperty({
++    description: 'Supplier name (must be unique)',
++    example: 'Global Tech Supplies',
++    minLength: 3,
++    maxLength: 100,
++  })
+   @IsString({ message: 'The supplier name must be string' })
+   @MinLength(3, { message: 'The supplier name must be at least 3 characters' })
+   @MaxLength(100, {
+@@ -17,6 +24,11 @@ export class CreateSupplierDto {
+   //* --------------------------------------------
+ 
+   //* Website:
++  @ApiProperty({
++    description: 'Supplier website URL (must be unique on update)',
++    example: 'https://globaltech.example.com',
++    format: 'uri',
++  })
+   @IsString({ message: 'The supplier website must be string' })
+   @IsUrl({}, { message: 'The Supplier website must be url' })
+   @IsDefined()
+diff --git a/src/supplier/dto/get-supplier.dto.ts b/src/supplier/dto/get-supplier.dto.ts
+index adbbf62..791332a 100644
+--- a/src/supplier/dto/get-supplier.dto.ts
++++ b/src/supplier/dto/get-supplier.dto.ts
+@@ -1,13 +1,28 @@
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { Type } from 'class-transformer';
+ import { IsInt, IsOptional, Min } from 'class-validator';
+ 
+ export class GetSupplierDto {
++  @ApiPropertyOptional({
++    description: 'Maximum number of documents to return (page size)',
++    type: Number,
++    default: 10,
++    minimum: 1,
++    example: 10,
++  })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+   limit?: number = 10;
+ 
++  @ApiPropertyOptional({
++    description: 'Number of documents to skip',
++    type: Number,
++    default: 0,
++    minimum: 0,
++    example: 0,
++  })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+diff --git a/src/supplier/dto/supplier-response.dto.ts b/src/supplier/dto/supplier-response.dto.ts
+new file mode 100644
+index 0000000..16b4d95
+--- /dev/null
++++ b/src/supplier/dto/supplier-response.dto.ts
+@@ -0,0 +1,13 @@
++import { ApiProperty } from '@nestjs/swagger';
++import { BaseDocumentDto } from 'src/common/swagger/swagger.helpers';
++
++export class SupplierResponseDto extends BaseDocumentDto {
++  @ApiProperty({ description: 'Supplier name', example: 'Global Tech Supplies' })
++  name!: string;
++
++  @ApiProperty({
++    description: 'Supplier website URL',
++    example: 'https://globaltech.example.com',
++  })
++  website!: string;
++}
+diff --git a/src/supplier/dto/update-supplier.dto.ts b/src/supplier/dto/update-supplier.dto.ts
+index 40a7218..7c24010 100644
+--- a/src/supplier/dto/update-supplier.dto.ts
++++ b/src/supplier/dto/update-supplier.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateSupplierDto } from './create-supplier.dto';
+ 
+ export class UpdateSupplierDto extends PartialType(CreateSupplierDto) {}
+diff --git a/src/supplier/supplier.controller.ts b/src/supplier/supplier.controller.ts
+index 3f53fbb..c8f057e 100644
+--- a/src/supplier/supplier.controller.ts
++++ b/src/supplier/supplier.controller.ts
+@@ -18,7 +18,16 @@ import { Role } from 'src/user/enums/roles.enum';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
+ import { GetSupplierDto } from './dto/get-supplier.dto';
++import { SupplierResponseDto } from './dto/supplier-response.dto';
++import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
+ 
++@ApiTags('Supplier')
+ @Controller('supplier')
+ export class SupplierController {
+   constructor(private readonly supplierService: SupplierService) {}
+@@ -29,6 +38,19 @@ export class SupplierController {
+   //* @access Private['admin']
+   //?=======================================
+   @Post()
++  @ApiOperation({
++    summary: 'Create a supplier',
++    description:
++      'Creates a new supplier. **Access:** Admin (Bearer token required). The name must be unique (400 otherwise); the website must be a valid URL.',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    status: 201,
++    description: 'Supplier created',
++    message: 'The Supplier created successfully',
++    model: SupplierResponseDto,
++  })
++  @ApiErrors(400)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   create(@Body(new ValidationPipe({
+@@ -44,6 +66,18 @@ export class SupplierController {
+   //* @access Public
+   //?=======================================
+   @Get()
++  @ApiOperation({
++    summary: 'List suppliers',
++    description:
++      'Returns a paginated list of suppliers. Defaults: limit=10, skip=0. **Access:** Public.',
++  })
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'Paginated suppliers',
++    message: 'coupons fetched successfully',
++    list: { key: 'suppliers', model: SupplierResponseDto },
++  })
++  @ApiErrors(400)
+   findAll(@Query(new ValidationPipe({
+     whitelist: true,
+     transform: true,
+@@ -57,6 +91,19 @@ export class SupplierController {
+   //* @access Public
+   //?=======================================
+   @Get(':id')
++  @ApiOperation({
++    summary: 'Get a supplier by id',
++    description:
++      'Returns a single supplier. **Access:** Public.',
++  })
++  @ApiMongoIdParam('id', 'ObjectId of the supplier')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The supplier',
++    message: 'The supplier founded successfully',
++    model: SupplierResponseDto,
++  })
++  @ApiErrors(400, 404)
+   findOne(@Param('id') id: string) {
+     return this.supplierService.findOne(id);
+   }
+@@ -67,6 +114,20 @@ export class SupplierController {
+   //* @access Private['amdin']
+   //?=======================================
+   @Patch(':id')
++  @ApiOperation({
++    summary: 'Update a supplier',
++    description:
++      'Partially updates a supplier (all body fields are optional). **Access:** Admin (Bearer token required). A changed name and a changed website must each stay unique (400).',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the supplier')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The updated supplier',
++    message: 'The supplier updated successfully',
++    model: SupplierResponseDto,
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   update(
+@@ -85,6 +146,18 @@ export class SupplierController {
+   //* @access Private['amdin']
+   //?=======================================
+   @Delete(':id')
++  @ApiOperation({
++    summary: 'Delete a supplier',
++    description:
++      'Deletes a supplier. **Access:** Admin (Bearer token required). The service returns nothing, so the response has an empty body.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the supplier')
++  @ApiResponse({
++    status: 200,
++    description: 'Supplier deleted (empty body)',
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   remove(@Param('id') id: string) {
+diff --git a/src/tax/dto/create-tax.dto.ts b/src/tax/dto/create-tax.dto.ts
+index 5fbe06f..958d96e 100644
+--- a/src/tax/dto/create-tax.dto.ts
++++ b/src/tax/dto/create-tax.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiProperty } from '@nestjs/swagger';
+ import { Type } from 'class-transformer';
+ import {
+   IsDefined,
+@@ -10,6 +11,13 @@ import {
+ 
+ export class CreateTaxDto {
+   //* Name:
++  @ApiProperty({
++    description:
++      'Tax name (must be unique). The order flow reads "productTax" and "shippingTax"',
++    example: 'productTax',
++    minLength: 3,
++    maxLength: 50,
++  })
+   @IsString({ message: 'The Name of Tax must be string' })
+   @IsDefined()
+   @MinLength(3, { message: 'The Tax Name must be at least 3 characters' })
+@@ -18,6 +26,11 @@ export class CreateTaxDto {
+   //* -----------------------------------------------
+ 
+   //* Prive:
++  @ApiProperty({
++    description: 'Fixed tax amount, greater than or equal to 0',
++    example: 15,
++    minimum: 0,
++  })
+   @IsNumber({}, { message: 'The Name of Tax must be string' })
+   @IsDefined()
+   @Min(0, { message: 'The Tax Price must be greater or equal to zero' })
+diff --git a/src/tax/dto/tax-response.dto.ts b/src/tax/dto/tax-response.dto.ts
+new file mode 100644
+index 0000000..ea5ffe2
+--- /dev/null
++++ b/src/tax/dto/tax-response.dto.ts
+@@ -0,0 +1,19 @@
++import { ApiProperty } from '@nestjs/swagger';
++import { BaseDocumentDto } from 'src/common/swagger/swagger.helpers';
++
++export class TaxResponseDto extends BaseDocumentDto {
++  @ApiProperty({
++    description:
++      'Tax name. The order flow looks up the entries named "productTax" and "shippingTax"',
++    example: 'productTax',
++  })
++  name!: string;
++
++  @ApiProperty({
++    description:
++      'Fixed tax amount (>= 0). The order service adds the "productTax" and "shippingTax" prices to the order total',
++    example: 15,
++    minimum: 0,
++  })
++  price!: number;
++}
+diff --git a/src/tax/dto/update-tax.dto.ts b/src/tax/dto/update-tax.dto.ts
+index a2314ec..0edb38e 100644
+--- a/src/tax/dto/update-tax.dto.ts
++++ b/src/tax/dto/update-tax.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateTaxDto } from './create-tax.dto';
+ 
+ export class UpdateTaxDto extends PartialType(CreateTaxDto) {}
+diff --git a/src/tax/tax.controller.ts b/src/tax/tax.controller.ts
+index 493d750..1c17474 100644
+--- a/src/tax/tax.controller.ts
++++ b/src/tax/tax.controller.ts
+@@ -16,7 +16,16 @@ import { Roles } from 'src/user/decorator/roles.decorator';
+ import { Role } from 'src/user/enums/roles.enum';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
++import { TaxResponseDto } from './dto/tax-response.dto';
++import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
+ 
++@ApiTags('Tax')
+ @Controller('tax')
+ export class TaxController {
+   constructor(private readonly taxService: TaxService) {}
+@@ -27,6 +36,19 @@ export class TaxController {
+   //* @access Private['admin']
+   //?=======================================
+   @Post()
++  @ApiOperation({
++    summary: 'Create a tax',
++    description:
++      'Creates a new tax entry. **Access:** Admin (Bearer token required). The name must be unique (400 otherwise). The order flow reads the entries named "productTax" and "shippingTax" and adds their `price` to the order total.',
++  })
++  @ApiPrivate('admin')
++  @ApiEnvelopeResponse({
++    status: 201,
++    description: 'Tax created',
++    message: 'Tax created successfully',
++    model: TaxResponseDto,
++  })
++  @ApiErrors(400)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   create(
+@@ -47,6 +69,19 @@ export class TaxController {
+   //* @access Private['admin']
+   //?=======================================
+   @Get()
++  @ApiOperation({
++    summary: 'List all taxes',
++    description:
++      'Returns all tax entries (no pagination). **Access:** Admin (Bearer token required).',
++  })
++  @ApiPrivate('admin')
++  @ApiExtraModels(TaxResponseDto)
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'List of taxes',
++    message: 'tax is fetched successfully',
++    data: { type: 'array', items: { $ref: getSchemaPath(TaxResponseDto) } },
++  })
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   findAll() {
+@@ -59,6 +94,20 @@ export class TaxController {
+   //* @access Private['admin']
+   //?=======================================
+   @Get(':id')
++  @ApiOperation({
++    summary: 'Get a tax by id',
++    description:
++      'Returns a single tax entry. **Access:** Admin (Bearer token required).',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the tax')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The tax',
++    message: 'The Tax is founded successfully',
++    model: TaxResponseDto,
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   findOne(@Param('id') id: string) {
+@@ -71,6 +120,20 @@ export class TaxController {
+   //* @access Private['admin']
+   //?=======================================
+   @Patch(':id')
++  @ApiOperation({
++    summary: 'Update a tax',
++    description:
++      'Partially updates a tax entry (all body fields are optional). **Access:** Admin (Bearer token required). A changed name must stay unique (400).',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the tax')
++  @ApiEnvelopeResponse({
++    status: 200,
++    description: 'The updated tax',
++    message: 'The Tax is updated successfully',
++    model: TaxResponseDto,
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   update(
+@@ -92,6 +155,18 @@ export class TaxController {
+   //* @access Private['admin']
+   //?=======================================
+   @Delete(':id')
++  @ApiOperation({
++    summary: 'Delete a tax',
++    description:
++      'Deletes a tax entry. **Access:** Admin (Bearer token required). The service returns nothing, so the response has an empty body.',
++  })
++  @ApiPrivate('admin')
++  @ApiMongoIdParam('id', 'ObjectId of the tax')
++  @ApiResponse({
++    status: 200,
++    description: 'Tax deleted (empty body)',
++  })
++  @ApiErrors(400, 404)
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+   remove(@Param('id') id: string) {
+diff --git a/src/upload-images/dto/cloudinary-upload-response.dto.ts b/src/upload-images/dto/cloudinary-upload-response.dto.ts
+new file mode 100644
+index 0000000..ce4268a
+--- /dev/null
++++ b/src/upload-images/dto/cloudinary-upload-response.dto.ts
+@@ -0,0 +1,52 @@
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
++
++/** Raw result returned by Cloudinary's upload API (main fields). */
++export class CloudinaryUploadResponseDto {
++  @ApiProperty({ example: '3f5a0c7e8b1d4e2a9c6b7d8e9f0a1b2c' })
++  asset_id!: string;
++
++  @ApiProperty({ example: 'sample_abc123', description: 'Use it to delete/transform the image later' })
++  public_id!: string;
++
++  @ApiProperty({ example: 1762160000 })
++  version!: number;
++
++  @ApiProperty({ example: 'v1762160000' })
++  version_id!: string;
++
++  @ApiProperty({ example: 'a1b2c3d4e5f6a7b8c9d0' })
++  signature!: string;
++
++  @ApiProperty({ example: 800 })
++  width!: number;
++
++  @ApiProperty({ example: 600 })
++  height!: number;
++
++  @ApiProperty({ example: 'jpg' })
++  format!: string;
++
++  @ApiProperty({ example: 'image' })
++  resource_type!: string;
++
++  @ApiProperty({ example: '2026-11-03T10:15:30Z' })
++  created_at!: string;
++
++  @ApiProperty({ example: [], type: [String] })
++  tags!: string[];
++
++  @ApiProperty({ example: 45210, description: 'File size in bytes' })
++  bytes!: number;
++
++  @ApiProperty({ example: 'upload' })
++  type!: string;
++
++  @ApiProperty({ example: 'http://res.cloudinary.com/demo/image/upload/v1762160000/sample_abc123.jpg' })
++  url!: string;
++
++  @ApiProperty({ example: 'https://res.cloudinary.com/demo/image/upload/v1762160000/sample_abc123.jpg', description: 'HTTPS URL to store in the database' })
++  secure_url!: string;
++
++  @ApiPropertyOptional({ example: 'sample_abc123.jpg' })
++  original_filename?: string;
++}
+diff --git a/src/upload-images/upload-images.controller.ts b/src/upload-images/upload-images.controller.ts
+index 26eb875..bbf63db 100644
+--- a/src/upload-images/upload-images.controller.ts
++++ b/src/upload-images/upload-images.controller.ts
+@@ -11,12 +11,22 @@ import {
+ } from '@nestjs/common';
+ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+ import { Max } from 'class-validator';
++import {
++  ApiBody,
++  ApiConsumes,
++  ApiOperation,
++  ApiResponse,
++  ApiTags,
++} from '@nestjs/swagger';
++import { ApiErrors, ApiPrivate } from 'src/common/swagger/swagger.helpers';
++import { CloudinaryUploadResponseDto } from './dto/cloudinary-upload-response.dto';
+ import { UploadImagesService } from 'src/upload-images/upload-images.service';
+ import { Roles } from 'src/user/decorator/roles.decorator';
+ import { Role } from 'src/user/enums/roles.enum';
+ import { AuthGuard } from 'src/user/guard/auth.guard';
+ import { RolesGuard } from 'src/user/guard/role.guard';
+ 
++@ApiTags('Upload')
+ @Controller('image')
+ export class UploadImagesController {
+   constructor(private readonly cloudinaryService: UploadImagesService) {}
+@@ -26,6 +36,24 @@ export class UploadImagesController {
+   //* @Route  POST /api/v1/image/upload-image
+   //* @access Private['admin']
+   //?=======================================
++  @ApiOperation({
++    summary: 'Upload an image to Cloudinary',
++    description:
++      'Uploads one image (multipart field `file`) to Cloudinary and returns the raw Cloudinary result. Use `secure_url` as `imageCover`/`images` when creating products, or as `image` for categories/brands. **Access:** Admin. Allowed types: jpeg, jpg, png. Max size: 500,000 bytes (~488 KB).',
++  })
++  @ApiConsumes('multipart/form-data')
++  @ApiBody({
++    schema: {
++      type: 'object',
++      required: ['file'],
++      properties: {
++        file: { type: 'string', format: 'binary', description: 'jpeg/jpg/png image, max 500,000 bytes' },
++      },
++    },
++  })
++  @ApiResponse({ status: 201, description: 'Image uploaded', type: CloudinaryUploadResponseDto })
++  @ApiErrors([400, 'Bad Request – file missing, larger than 500,000 bytes, or not jpeg/jpg/png'])
++  @ApiPrivate('admin')
+   @Post('upload-image')
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+diff --git a/src/user/dto/create-user.dto.ts b/src/user/dto/create-user.dto.ts
+index 089231f..93d21d0 100644
+--- a/src/user/dto/create-user.dto.ts
++++ b/src/user/dto/create-user.dto.ts
+@@ -1,4 +1,5 @@
+ import { Optional } from '@nestjs/common';
++import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+ import {
+   IsBoolean,
+   IsDate,
+@@ -18,6 +19,7 @@ import {
+ 
+ export class CreateUserDto {
+   //* Name:
++  @ApiProperty({ description: 'Full name', example: 'Ahmed Ali', minLength: 3, maxLength: 30 })
+   @IsString({ message: 'name must be string' })
+   @MinLength(3, { message: 'name must be at least 3 characters' })
+   @MaxLength(30, { message: 'name must at most 30 characters' })
+@@ -25,12 +27,20 @@ export class CreateUserDto {
+   //*=======================================
+ 
+   //* Email:
++  @ApiProperty({ description: 'Unique email address', example: 'ahmed.ali@example.com', format: 'email', minLength: 10 })
+   @IsEmail({}, { message: 'email must be string' })
+   @MinLength(10, { message: 'email must be at least 10 characters' })
+   email!: string;
+   //*=======================================
+ 
+   //* Password:
++  @ApiProperty({
++    description:
++      'Account password (stored hashed). Required: the `@Optional()` below is the Nest DI decorator, not class-validator\'s, so it does not make the field optional.',
++    example: 'P@ssw0rd123',
++    minLength: 3,
++    maxLength: 20,
++  })
+   @IsString({ message: 'password must be string' })
+   @MinLength(3, { message: 'password must be at least 3 characters' })
+   @MaxLength(20, { message: 'password must at most 20 characters' })
+@@ -39,6 +49,7 @@ export class CreateUserDto {
+   //*=======================================
+ 
+   //* Role:
++  @ApiPropertyOptional({ description: 'User role', enum: ['user', 'admin'], example: 'user', default: 'user' })
+   @IsString({ message: 'role must be string' })
+   @IsOptional()
+   @IsEnum(['user', 'admin'], { message: 'role must be user or admin' })
+@@ -46,12 +57,14 @@ export class CreateUserDto {
+   //*=======================================
+ 
+   //* Avatar:
++  @ApiPropertyOptional({ description: 'Avatar image URL', example: 'https://example.com/avatars/ahmed.png', format: 'uri' })
+   @IsUrl()
+   @IsOptional()
+   avatar!: string;
+   //*=======================================
+ 
+   //* Age:
++  @ApiPropertyOptional({ description: 'Age in years', example: 25, minimum: 18 })
+   @IsNumber()
+   @IsOptional()
+   @Min(18, { message: 'Age must be above 18 years old' })
+@@ -59,18 +72,24 @@ export class CreateUserDto {
+   //*=======================================
+ 
+   //* PhoneNumber:
++  @ApiPropertyOptional({ description: 'Egyptian phone number', example: '+201012345678' })
+   @IsPhoneNumber('EG', { message: 'phone must be and Egyptation number' })
+   @IsOptional()
+   phoneNumber!: string;
+   //*=======================================
+ 
+   //* Address:
++  @ApiPropertyOptional({ description: 'Postal address', example: '12 Tahrir St, Cairo' })
+   @IsString({ message: 'the address must be sting' })
+   @IsOptional()
+   address!: string;
+   //*=======================================
+ 
+   //* Active:
++  @ApiPropertyOptional({
++    description: 'Internal – accepted by validation but ignored on creation (the service always sets active=true).',
++    example: true,
++  })
+   @IsBoolean({ message: 'active must be boolean' })
+   @IsOptional()
+   @IsEnum([false, true], { message: 'active must be true or false only' })
+@@ -78,6 +97,12 @@ export class CreateUserDto {
+   //*=======================================
+ 
+   //* verificationCode:
++  @ApiPropertyOptional({
++    description: 'Internal – used by the password-reset flow, not meant to be set by clients. Must be a 6-character string if sent.',
++    example: '123456',
++    minLength: 6,
++    maxLength: 6,
++  })
+   @IsString({ message: 'the verificationCode must be string' })
+   @Length(6, 6, { message: 'the verificationCode must be 6 characters' })
+   @IsOptional()
+@@ -86,12 +111,18 @@ export class CreateUserDto {
+ 
+ 
+   //* verificationCodeExpired:
++  @ApiPropertyOptional({
++    description: 'Internal – not usable via JSON (validated with @IsDate, so a JSON string fails validation).',
++    type: String,
++    format: 'date-time',
++  })
+   @IsDate({ message: 'the verificationCodeExpired must be string' })
+   @IsOptional()
+   verificationCodeExpired!: string;
+   //*=======================================
+ 
+   //* Gender:
++  @ApiPropertyOptional({ description: 'Gender', enum: ['male', 'female'], example: 'male' })
+   @IsString({ message: 'the gender must be string' })
+   @IsOptional()
+   @IsEnum(['male', 'female'], { message: 'the gender must be male or female' })
+diff --git a/src/user/dto/get-users.dto.ts b/src/user/dto/get-users.dto.ts
+index 80e4d53..ae8c984 100644
+--- a/src/user/dto/get-users.dto.ts
++++ b/src/user/dto/get-users.dto.ts
+@@ -1,3 +1,4 @@
++import { ApiPropertyOptional } from '@nestjs/swagger';
+ import { Transform, Type } from 'class-transformer';
+ import {
+   IsBoolean,
+@@ -9,39 +10,47 @@ import {
+ } from 'class-validator';
+ 
+ export class GetUsersDto {
++  @ApiPropertyOptional({ description: 'Page size', example: 10, default: 10, minimum: 1 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(1)
+   limit?: number = 10;
+ 
++  @ApiPropertyOptional({ description: 'Number of documents to skip', example: 0, default: 0, minimum: 0 })
+   @IsOptional()
+   @Type(() => Number)
+   @IsInt()
+   @Min(0)
+   skip?: number = 0;
+ 
++  @ApiPropertyOptional({ description: 'Field to sort by', enum: ['name', 'email', 'role', 'active', 'createdAt'], default: 'createdAt' })
+   @IsOptional()
+   @IsString()
+   @IsIn(['name', 'email', 'role', 'active', 'createdAt'])
+   sort?: string = 'createdAt';
+ 
++  @ApiPropertyOptional({ description: 'Sort direction', enum: ['asc', 'desc'], default: 'desc' })
+   @IsOptional()
+   @IsIn(['asc', 'desc'])
+   order?: string = 'desc';
+ 
++  @ApiPropertyOptional({ description: 'Case-insensitive regex/partial match on name', example: 'ahmed' })
+   @IsOptional()
+   @IsString()
+   name?: string;
+ 
++  @ApiPropertyOptional({ description: 'Case-insensitive regex/partial match on email', example: 'example.com' })
+   @IsOptional()
+   @IsString()
+   email?: string;
+ 
++  @ApiPropertyOptional({ description: 'Exact role to filter by', enum: ['user', 'admin'], example: 'user' })
+   @IsOptional()
+   @IsString()
+   role?: string;
+ 
++  @ApiPropertyOptional({ description: 'Filter by active flag (`true` / `false`)', type: Boolean, example: true })
+   @IsOptional()
+   @Transform(({ value }) => {
+     if (value === 'true') return true;
+diff --git a/src/user/dto/update-user.dto.ts b/src/user/dto/update-user.dto.ts
+index dfd37fb..78ab602 100644
+--- a/src/user/dto/update-user.dto.ts
++++ b/src/user/dto/update-user.dto.ts
+@@ -1,4 +1,4 @@
+-import { PartialType } from '@nestjs/mapped-types';
++import { PartialType } from '@nestjs/swagger';
+ import { CreateUserDto } from './create-user.dto';
+ 
+ export class UpdateUserDto extends PartialType(CreateUserDto) {}
+diff --git a/src/user/dto/user-response.dto.ts b/src/user/dto/user-response.dto.ts
+new file mode 100644
+index 0000000..0cc882d
+--- /dev/null
++++ b/src/user/dto/user-response.dto.ts
+@@ -0,0 +1,69 @@
++import { ApiHideProperty, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
++import { BaseDocumentDto } from 'src/common/swagger/swagger.helpers';
++
++/**
++ * A user document as returned by the API.
++ * `password` and `__v` are always removed/excluded by the services.
++ */
++export class UserResponseDto extends BaseDocumentDto {
++  @ApiProperty({ example: 'Ahmed Ali', description: 'Full name' })
++  name!: string;
++
++  @ApiProperty({ example: 'ahmed.ali@example.com', description: 'Unique email address' })
++  email!: string;
++
++  @ApiProperty({ enum: ['user', 'admin'], example: 'user', description: 'User role' })
++  role!: string;
++
++  @ApiPropertyOptional({ example: 'https://example.com/avatars/ahmed.png', description: 'Avatar URL' })
++  avatar?: string;
++
++  @ApiPropertyOptional({ example: 25, description: 'Age in years' })
++  age?: number;
++
++  @ApiPropertyOptional({ example: '+201012345678', description: 'Phone number (Egyptian format)' })
++  phoneNumber?: string;
++
++  @ApiPropertyOptional({ example: '12 Tahrir St, Cairo', description: 'Postal address' })
++  address?: string;
++
++  @ApiPropertyOptional({
++    example: true,
++    description: 'Whether the account is active. Soft-deleted accounts (DELETE /user/profile) have `false`. Set to `true` on sign-up.',
++  })
++  active?: boolean;
++
++  @ApiPropertyOptional({ enum: ['male', 'female'], example: 'male', description: 'Gender' })
++  gender?: string;
++
++  @ApiPropertyOptional({
++    example: '108234567890123456789',
++    description: 'Google account id. Only present for accounts created through Google sign-in.',
++  })
++  googleId?: string;
++
++  @ApiProperty({
++    example: false,
++    description: 'Whether the email was verified (true for accounts created via Google). Defaults to false.',
++  })
++  emailVerified!: boolean;
++
++  // Internal password-reset fields: returned by some endpoints but not meant for clients
++  @ApiHideProperty()
++  verificationCode?: string;
++
++  @ApiHideProperty()
++  verificationCodeExpired?: Date;
++}
++
++/** Subset of the user returned by POST /user (admin create) */
++export class CreatedUserResponseDto {
++  @ApiProperty({ example: 'Ahmed Ali' })
++  name!: string;
++
++  @ApiProperty({ example: 'ahmed.ali@example.com' })
++  email!: string;
++
++  @ApiProperty({ enum: ['user', 'admin'], example: 'user', description: 'Defaults to `user` when not sent' })
++  role!: string;
++}
+diff --git a/src/user/user.controller.ts b/src/user/user.controller.ts
+index 51cf184..f0966a4 100644
+--- a/src/user/user.controller.ts
++++ b/src/user/user.controller.ts
+@@ -19,6 +19,17 @@ import { Roles } from './decorator/roles.decorator';
+ import { Role } from './enums/roles.enum';
+ import { RolesGuard } from './guard/role.guard';
+ import { GetUsersDto } from './dto/get-users.dto';
++import { ApiOperation, ApiTags } from '@nestjs/swagger';
++import {
++  ApiEnvelopeResponse,
++  ApiErrors,
++  ApiMongoIdParam,
++  ApiPrivate,
++} from 'src/common/swagger/swagger.helpers';
++import {
++  CreatedUserResponseDto,
++  UserResponseDto,
++} from './dto/user-response.dto';
+ @Controller('user')
+ export class UserController {
+   constructor(private readonly userService: UserService) {}
+@@ -28,6 +39,23 @@ export class UserController {
+   //* @Route  POST /api/v1/user
+   //* @access Private[admin]
+   //?=======================================
++  @ApiTags('Users (admin)')
++  @ApiOperation({
++    summary: 'Create a user',
++    description:
++      'Creates a user (role defaults to `user`, always created active, password hashed). **Access:** Admin. Returns only name, email and role of the new user.',
++  })
++  @ApiEnvelopeResponse({
++    status: 201,
++    bodyStatus: 200,
++    description: 'User created. The HTTP status is 201 but the `status` field in the body is 200.',
++    message: 'Get All users sucessfully :)',
++    model: CreatedUserResponseDto,
++  })
++  @ApiErrors(
++    [400, 'Bad Request – validation failed, or the email already exists (`User already exist`)'],
++  )
++  @ApiPrivate('admin')
+   @Post()
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -48,6 +76,19 @@ export class UserController {
+   //* @Route  GET /api/v1/user
+   //* @access Private[admin]
+   //?=======================================
++  @ApiTags('Users (admin)')
++  @ApiOperation({
++    summary: 'List users',
++    description:
++      'Returns a paginated, filterable and sortable list of users (password excluded). **Access:** Admin. Defaults: limit 10, skip 0, sorted by createdAt desc. `name` and `email` are case-insensitive partial matches; `role` and `active` are exact.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Users fetched.',
++    message: 'Users fetched successfully',
++    list: { key: 'users', model: UserResponseDto },
++  })
++  @ApiErrors(400)
++  @ApiPrivate('admin')
+   @Get()
+   @Roles(Role.Admin)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -68,6 +109,18 @@ export class UserController {
+   //* @Route  GET /api/v1/user/profile
+   //* @access Private[user,admin]
+   //?=======================================
++  @ApiTags('Profile')
++  @ApiOperation({
++    summary: 'Get my profile',
++    description: 'Returns the profile of the logged-in user (taken from the JWT). **Access:** User & Admin.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Profile found.',
++    message: 'User Found sucessfully :)',
++    model: UserResponseDto,
++  })
++  @ApiErrors(404)
++  @ApiPrivate('user', 'admin')
+   @Get('profile')
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -81,6 +134,24 @@ export class UserController {
+   //* @Route  PATCH /api/v1/user/profile
+   //* @access Private[user,admin]
+   //?=======================================
++  @ApiTags('Profile')
++  @ApiOperation({
++    summary: 'Update my profile',
++    description:
++      'Updates the logged-in user. All fields are optional; a new password is hashed. **Access:** User & Admin. Sending `role` as a non-admin returns 401 even if the value is unchanged. Changing to an email used by another user returns 409.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Profile updated.',
++    message: 'User Updated sucessfully :)',
++    wrap: { key: 'updatedUser', model: UserResponseDto },
++  })
++  @ApiErrors(
++    [400, 'Bad Request – validation failed'],
++    [401, 'Unauthorized – missing/invalid token, or a non-admin sent `role`'],
++    [404, 'Not Found – the user no longer exists'],
++    [409, 'Conflict – the email is used by another user (`This email already exist`)'],
++  )
++  @ApiPrivate('user', 'admin')
+   @Patch('profile')
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -103,6 +174,18 @@ export class UserController {
+   //* @Route  DELETE /api/v1/user/profile
+   //* @access Private[user,admin]
+   //?=======================================
++  @ApiTags('Profile')
++  @ApiOperation({
++    summary: 'Delete my account (soft delete)',
++    description:
++      'Deactivates the logged-in user by setting `active` to false; the document is NOT removed. **Access:** User & Admin. A deactivated user can no longer sign in.',
++  })
++  @ApiEnvelopeResponse({
++    description: 'Account deactivated.',
++    message: 'User Delete sucessfully :(',
++  })
++  @ApiErrors(404)
++  @ApiPrivate('user', 'admin')
+   @Delete('profile')
+   @Roles(Role.Admin, Role.User)
+   @UseGuards(AuthGuard, RolesGuard)
+@@ -117,6 +200,19 @@ export class UserController {
+   //* @Route  GET /api/v1/user/:id
+   //* @access Private[admin]
+   //?=======================================
++  @ApiTags('Users (admin)')
++  @ApiOperation({
++    summary: 'Get a user by id',
++    description:
++      '⚠️ Intended for admins only, but this route currently has no auth guard in the code. Returns the user (password excluded).',
++  })
++  @ApiMongoIdParam('id', 'User id')
++  @ApiEnvelopeResponse({
++    description: 'User found.',
++    message: 'User Founded sucessfully :)',
++    model: UserResponseDto,
++  })
++  @ApiErrors([400, 'Bad Request – `id` is not a valid ObjectId'], 404)
+   @Get(':id')
+   findOne(@Param('id') id: string) {
+     return this.userService.findOne(id);
+@@ -127,6 +223,23 @@ export class UserController {
+   //* @Route  PATCH /api/v1/user/:id
+   //* @access Private[admin]
+   //?=======================================
++  @ApiTags('Users (admin)')
++  @ApiOperation({
++    summary: 'Update a user by id',
++    description:
++      '⚠️ Intended for admins only, but this route currently has no auth guard in the code. Updates any user; a new password is hashed. Unlike PATCH /user/profile, `role` may be sent freely. Note: this route has no ValidationPipe, so the body is not validated.',
++  })
++  @ApiMongoIdParam('id', 'User id')
++  @ApiEnvelopeResponse({
++    description: 'User updated.',
++    message: 'User Updated sucessfully :)',
++    wrap: { key: 'updatedUser', model: UserResponseDto },
++  })
++  @ApiErrors(
++    [400, 'Bad Request – `id` is not a valid ObjectId'],
++    404,
++    [409, 'Conflict – the email is used by another user (`This email already exist`)'],
++  )
+   @Patch(':id')
+   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+     return this.userService.update(id, updateUserDto);
+@@ -137,6 +250,18 @@ export class UserController {
+   //* @Route  DELETE /api/v1/user/:id
+   //* @access Private[admin]
+   //?=======================================
++  @ApiTags('Users (admin)')
++  @ApiOperation({
++    summary: 'Delete a user by id',
++    description:
++      '⚠️ Intended for admins only, but this route currently has no auth guard in the code. Permanently deletes the user document (hard delete).',
++  })
++  @ApiMongoIdParam('id', 'User id')
++  @ApiEnvelopeResponse({
++    description: 'User deleted.',
++    message: 'User Deleted sucessfully :(',
++  })
++  @ApiErrors([400, 'Bad Request – `id` is not a valid ObjectId'], 404)
+   @Delete(':id')
+   remove(@Param('id') id: string) {
+     return this.userService.remove(id);

@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsOptional,
   IsString,
@@ -9,6 +10,12 @@ import {
 
 export class CreateCategoryDto {
   //* Name
+  @ApiProperty({
+    description: 'Category name (must be unique)',
+    example: 'Electronics',
+    minLength: 3,
+    maxLength: 30,
+  })
   @IsString({ message: 'The Category name must be string' })
   @MinLength(3, { message: 'The Min Length for category name is 3 characters' })
   @MaxLength(30, {
@@ -18,6 +25,11 @@ export class CreateCategoryDto {
   //* ----------------------------------------------------
 
   //* image
+  @ApiPropertyOptional({
+    description: 'Category image URL',
+    example: 'https://example.com/images/electronics.png',
+    format: 'uri',
+  })
   @IsString({ message: 'The Image must be string' })
   @IsUrl({}, { message: 'The image Url must be vaild url' })
   @IsOptional()
