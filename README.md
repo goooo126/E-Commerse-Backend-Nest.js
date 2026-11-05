@@ -20,79 +20,199 @@
 </p>
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+# E-Commerce Backend (NestJS)
 
-## Description
+A REST API for an online store, built with **NestJS 11**, **MongoDB (Mongoose)** and **TypeScript**. It covers authentication (including Google sign-in), a product catalog, carts, coupons, orders, Stripe card payments and image uploads. Every endpoint is documented with Swagger.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Features
 
-## Project setup
+- **Auth:** sign-up, sign-in, forgot/verify/change password by email code, Google sign-in (ID token), JWT access tokens
+- **Roles:** `user` and `admin`, enforced by guards
+- **Catalog:** categories, sub-categories, brands, suppliers, products with filtering, sorting and pagination
+- **Reviews:** one review per user per product, with product rating aggregation
+- **Cart:** add/update/remove items, apply/remove coupons
+- **Orders:** cash or card (Stripe Checkout, EGP), admin status updates
+- **Payments:** Stripe webhook confirms payment, deducts stock and clears the cart in one MongoDB transaction
+- **Product requests:** users can ask the store to stock an item
+- **Taxes:** `productTax` and `shippingTax` entries are added to the order total
+- **Uploads:** image upload to Cloudinary (admin only)
+- **API docs:** Swagger UI with Bearer authorization
 
-```bash
-$ npm install
-```
+## Tech stack
 
-## Compile and run the project
+| Area | Technology |
+| --- | --- |
+| Framework | NestJS 11, TypeScript |
+| Database | MongoDB with Mongoose 9 (replica set required) |
+| Auth | `@nestjs/jwt`, bcrypt, `google-auth-library` |
+| Validation | class-validator, class-transformer |
+| Payments | Stripe |
+| Email | `@nestjs-modules/mailer` (Gmail SMTP) |
+| Images | Cloudinary |
+| Docs | `@nestjs/swagger` |
 
-```bash
-# development
-$ npm run start
+## Prerequisites
 
-# watch mode
-$ npm run start:dev
+- Node.js 20 or later and npm
+- MongoDB running as a **replica set** (the Stripe webhook and cash orders use transactions, which MongoDB only supports on a replica set)
+- A Stripe account, a Cloudinary account, a Google OAuth client ID and a Gmail app password
 
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Getting started
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# 1. Install dependencies
+npm install
+
+# 2. Create a .env file in the project root (see the table below)
+
+# 3. Start MongoDB as a single-node replica set (first time only)
+mongod --replSet rs0 --dbpath ./data
+mongosh --eval 'rs.initiate()'
+
+# 4. Run the API in watch mode
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+The API listens on **http://localhost:3000**.
 
-## Resources
+> The MongoDB connection string is currently hard-coded in `src/app.module.ts` as `mongodb://localhost:27017/ecommerce?replicaSet=rs0`. Change it there if your database lives elsewhere.
 
-Check out a few resources that may come in handy when working with NestJS:
+## Environment variables
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Create a `.env` file in the project root:
 
-## Support
+| Variable | Description |
+| --- | --- |
+| `JWT_SECRET` | Secret used to sign and verify JWTs |
+| `EMAIL_USER` | Gmail address used to send password-reset codes |
+| `EMAIL_PASSWORD` | Gmail app password for that address |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID (audience of the ID token) |
+| `STRIPE_SECRET_KEY` | Stripe secret key (`sk_test_...`) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) |
+| `FRONTEND_URL` | Frontend base URL, used for the Stripe success and cancel redirects |
+| `CLOUDINARY_NAME` | Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Never commit `.env`.
 
-## Stay in touch
+## API documentation (Swagger)
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+With the server running:
+
+| URL | What it is |
+| --- | --- |
+| http://localhost:3000/docs | Swagger UI |
+| http://localhost:3000/docs-json | Raw OpenAPI JSON (importable into Postman) |
+
+To try protected endpoints:
+
+1. Call `POST /auth/sign-in` (or `/auth/sign-up`) from the UI.
+2. Copy `access_token` from the response.
+3. Click **Authorize** and paste the token (without the word `Bearer`).
+
+## Endpoints overview
+
+| Module | Base path | Access |
+| --- | --- | --- |
+| Auth | `/auth` | Public |
+| Users (admin) and profile | `/user` | Admin; `/user/profile` for any signed-in user |
+| Categories | `/category` | Read: public, write: admin |
+| Sub-categories | `/sub-category` | Read: public, write: admin |
+| Brands | `/brand` | Read: public, write: admin |
+| Suppliers | `/supplier` | Read: public, write: admin |
+| Products | `/product` | Read: public, write: admin |
+| Reviews | `/review` | User and admin |
+| Coupons | `/coupon` | Admin |
+| Taxes | `/tax` | Admin |
+| Product requests | `/req-product` | User and admin |
+| Cart | `/cart` | User (admin can list carts) |
+| Orders | `/order` | User and admin |
+| Stripe webhook | `/stripe/webhook` | Called by Stripe only |
+| Image upload | `/image/upload-image` | Admin |
+
+See Swagger for the full list of routes, parameters and responses.
+
+## Response format
+
+Most endpoints return a common envelope:
+
+```json
+{
+  "status": 200,
+  "message": "Products fetched successfully",
+  "data": {}
+}
+```
+
+List endpoints return `data: { <items>, pagination: { total, limit, skip, returned } }`.
+
+Errors follow the standard NestJS shape. `message` is an array when validation fails:
+
+```json
+{
+  "statusCode": 400,
+  "message": ["email must be an email"],
+  "error": "Bad Request"
+}
+```
+
+Note that a request with the wrong role returns **401**, not 403.
+
+## Payments with Stripe
+
+1. A user creates an order with `paymentMethod: "card"` (`POST /order`).
+2. The API creates a pending order and a Stripe Checkout session and returns `checkoutUrl`.
+3. The frontend redirects the user to `checkoutUrl`.
+4. Stripe calls `POST /stripe/webhook` with a `checkout.session.completed` event.
+5. The API verifies the signature, amount and currency, then marks the order paid, deducts stock and clears the cart in one transaction.
+
+To test locally with the Stripe CLI:
+
+```bash
+stripe listen --forward-to localhost:3000/stripe/webhook
+```
+
+Copy the printed `whsec_...` value into `STRIPE_WEBHOOK_SECRET`.
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run start:dev` | Start in watch mode |
+| `npm run start` | Start once |
+| `npm run build` | Compile to `dist/` |
+| `npm run start:prod` | Run the compiled build |
+| `npm run lint` | Lint and auto-fix |
+| `npm run format` | Format with Prettier |
+| `npm run test` | Unit tests |
+| `npm run test:e2e` | End-to-end tests |
+
+## Project structure
+
+```
+src/
+├── auth/            Sign-up, sign-in, password reset, Google login
+├── user/            Users, profile, role/auth guards
+├── category/        Categories
+├── sub-category/    Sub-categories
+├── brand/           Brands
+├── supplier/        Suppliers
+├── product/         Products and their reviews
+├── review/          Reviews
+├── coupon/          Coupons
+├── tax/             Taxes
+├── req-product/     Product requests
+├── cart/            Shopping cart
+├── order/           Orders and Stripe Checkout
+├── stripe/          Stripe webhook
+├── upload-images/   Cloudinary uploads
+├── common/          Shared decorators, mail service, Swagger helpers
+├── app.module.ts
+└── main.ts          Bootstrap, CORS, Swagger setup
+```
+
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED (private project).
